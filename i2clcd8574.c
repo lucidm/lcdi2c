@@ -55,14 +55,14 @@ static int lcdi2c_release(struct inode *inode, struct file *file)
     return SUCCESS;
 }
 
-static ssize_t lcdi2c_read(struct file *file, char __user *buffer, 
+static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer, 
 			   size_t length, loff_t *offset)
 {
     printk(KERN_INFO "read device\n");
     return length;
 }
 
-static ssize_t lcdi2c_write(struct file *file, const char __user *buffer, 
+static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer, 
 			    size_t length, loff_t *offset)
 {
     printk(KERN_INFO "write device\n");
@@ -139,8 +139,8 @@ static struct i2c_driver lcdi2c_driver = {
 
 
 static struct file_operations lcdi2c_fops = {
-	.read = lcdi2c_read,
-	.write = lcdi2c_write,
+	.read = lcdi2c_fopread,
+	.write = lcdi2c_fopwrite,
 //	.ioctl = NULL, //lcdi2c_ioctl,
 	.open = lcdi2c_open,
 	.release = lcdi2c_release,
@@ -475,6 +475,21 @@ static ssize_t lcdi2c_customchar_show(struct device *dev,
     return count;
 }
 
+static ssize_t lcdi2c_write(struct device* dev, 
+				 struct device_attribute* attr, 
+				 const char* buf, size_t count)
+{
+    if(down_interruptible(&data->sem))
+        return -ERESTARTSYS;
+    
+    if (buf && count > 0)
+    {
+      lcdwrite(data, buf[0]);
+    }
+    up(&data->sem);
+    return 1;
+}
+
 DEVICE_ATTR(reset, S_IWUSR | S_IWGRP, NULL, lcdi2c_reset);
 DEVICE_ATTR(backlight, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH,
 	    lcdi2c_backlight_show, lcdi2c_backlight);
@@ -492,6 +507,8 @@ DEVICE_ATTR(clear, S_IWUSR | S_IWGRP, NULL, lcdi2c_clear);
 DEVICE_ATTR(scrollhz, S_IWUSR | S_IWGRP, NULL, lcdi2c_scrollhz);
 DEVICE_ATTR(customchar, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
 	    lcdi2c_customchar_show, lcdi2c_customchar);
+DEVICE_ATTR(write, S_IWUSR | S_IWGRP, 
+	    NULL, lcdi2c_write);
 
 static const struct attribute *i2clcd_attrs[] = {
 	&dev_attr_reset.attr,
@@ -505,6 +522,7 @@ static const struct attribute *i2clcd_attrs[] = {
         &dev_attr_clear.attr,
         &dev_attr_scrollhz.attr,
         &dev_attr_customchar.attr,
+	&dev_attr_write.attr,
 	NULL,
 };
 
