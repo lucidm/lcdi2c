@@ -70,7 +70,7 @@ static ssize_t lcdi2c_write(struct file *file, const char __user *buffer,
 }
 
 
-static int lcdi2c_probe(struct i2c_client *client, struct i2c_device_id *id)
+static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     
     data = (LcdData_t *) devm_kzalloc(&client->dev, sizeof(LcdData_t), 
@@ -300,7 +300,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                          "Topology:%s=%d\n"
                          "Rows:%d\n"
                          "Columns:%d\n"
-                         "Lines addresses:%s\n"
+                         "Rows addresses:%s\n"
                          "Pins:RS=%d RW=%d E=%d BCKLIGHT=%d D[4]=%d D[5]=%d D[6]=%d D[7]=%d\n", 
                          data->organization.toponame, 
                          data->organization.topology, 
@@ -429,7 +429,7 @@ static ssize_t lcdi2c_customchar(struct device* dev,
     if ((count > 0 && (count % 9)) || count == 0)
     {
          dev_err(&client->dev, "incomplete character bitmap definition\n");
-         return 0;
+         return -ETOOSMALL;
     }
     
     if(down_interruptible(&data->sem))
@@ -441,7 +441,8 @@ static ssize_t lcdi2c_customchar(struct device* dev,
         {
             dev_err(&client->dev, "character number %d can only have values"
 				  "starting from 0 to 7\n", buf[i]);
-            continue;
+            up(&data->sem);
+	    return -ETOOSMALL;
         }
         
         lcdcustomchar(data, buf[i], buf + i + 1);
@@ -461,29 +462,36 @@ static ssize_t lcdi2c_customchar_show(struct device *dev,
     
     for (c = 0; c < 8; c++)
     {
-        buf[c * 8] = c;
+        buf[c * 9] = c;
+	count++;
         for (i = 0; i < 8; i++)
         {
-            buf[i + c * 8] = data->customchars[c][i];
+            buf[c * 9 + (i + 1)] = data->customchars[c][i];
             count++;
         }
     }
-    
+       
     up(&data->sem);
     return count;
 }
 
-DEVICE_ATTR(reset, 0664, NULL, lcdi2c_reset);
-DEVICE_ATTR(backlight, 0664,lcdi2c_backlight_show, lcdi2c_backlight);
-DEVICE_ATTR(cursorpos, 0664, lcdi2c_cursorpos_show, lcdi2c_cursorpos);
-DEVICE_ATTR(data, 0664, lcdi2c_data_show, lcdi2c_data);
-DEVICE_ATTR(meta, 0444, lcdi2c_meta_show, NULL);
-DEVICE_ATTR(cursor, 0664, lcdi2c_cursor_show, lcdi2c_cursor);
-DEVICE_ATTR(blink, 0664, lcdi2c_blink_show, lcdi2c_blink);
-DEVICE_ATTR(home, 0664, NULL, lcdi2c_home);
-DEVICE_ATTR(clear, 0664, NULL, lcdi2c_clear);
-DEVICE_ATTR(scrollhz, 0664, NULL, lcdi2c_scrollhz);
-DEVICE_ATTR(customchar, 0664, lcdi2c_customchar_show, lcdi2c_customchar);
+DEVICE_ATTR(reset, S_IWUSR | S_IWGRP, NULL, lcdi2c_reset);
+DEVICE_ATTR(backlight, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH,
+	    lcdi2c_backlight_show, lcdi2c_backlight);
+DEVICE_ATTR(cursorpos, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
+	    lcdi2c_cursorpos_show, lcdi2c_cursorpos);
+DEVICE_ATTR(data, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
+	    lcdi2c_data_show, lcdi2c_data);
+DEVICE_ATTR(meta, S_IRUSR | S_IRGRP, lcdi2c_meta_show, NULL);
+DEVICE_ATTR(cursor, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
+	    lcdi2c_cursor_show, lcdi2c_cursor);
+DEVICE_ATTR(blink, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
+	    lcdi2c_blink_show, lcdi2c_blink);
+DEVICE_ATTR(home, S_IWUSR | S_IWGRP, NULL, lcdi2c_home);
+DEVICE_ATTR(clear, S_IWUSR | S_IWGRP, NULL, lcdi2c_clear);
+DEVICE_ATTR(scrollhz, S_IWUSR | S_IWGRP, NULL, lcdi2c_scrollhz);
+DEVICE_ATTR(customchar, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
+	    lcdi2c_customchar_show, lcdi2c_customchar);
 
 static const struct attribute *i2clcd_attrs[] = {
 	&dev_attr_reset.attr,
@@ -601,10 +609,7 @@ static void __exit i2clcd857_exit(void)
 module_init(i2clcd857_init);
 module_exit(i2clcd857_exit);
 
-//module_i2c_driver(lcdi2c_driver);
-
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jarek Zok <jarekzok@gmail.com>");
 MODULE_DESCRIPTION("Driver for HD44780 LCD with PCF8574 I2C extension.");
 MODULE_VERSION("0.1.0");
-
