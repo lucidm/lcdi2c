@@ -19,7 +19,8 @@ static const char *toponames[] = {
                                     "16x1 type 2",
                                     };
 
-uint pinout[8] = {0,1,2,3,4,5,6,7}; //I2C module pinout configuration in order: RS,RW,E,BL,D4,D5,D6,D7
+uint pinout[8] = {0,1,2,3,4,5,6,7}; //I2C module pinout configuration in order: 
+                                    //RS,RW,E,BL,D4,D5,D6,D7
 
 void _udelay_(uint32_t usecs)
 {
@@ -90,7 +91,8 @@ void lcdsetcursor(LcdData_t *lcd, uint8_t column, uint8_t row)
 {
     lcd->column = (column >= lcd->organization.columns ? 0 : column);
     lcd->row = (row >= lcd->organization.rows ? 0 : row);
-    lcdcommand(lcd, LCD_DDRAM_SET | (lcd->column + lcd->organization.addresses[lcd->row]));
+    lcdcommand(lcd, LCD_DDRAM_SET | 
+                    (lcd->column + lcd->organization.addresses[lcd->row]));
 }
 
 void lcdsetbacklight(LcdData_t *lcd, uint8_t backlight)
@@ -136,22 +138,15 @@ void lcdclear(LcdData_t *lcd)
 
 void lcdscrollhoriz(LcdData_t *lcd, uint8_t direction)
 {
-    lcdcommand(lcd, LCD_DS_SHIFTDISPLAY | (direction ? LCD_DS_SHIFTRIGHT : LCD_DS_SHIFTLEFT));
+    lcdcommand(lcd, LCD_DS_SHIFTDISPLAY | 
+	      (direction ? LCD_DS_SHIFTRIGHT : LCD_DS_SHIFTLEFT));
 }
 
 void lcdscrollvert(LcdData_t *lcd, uint8_t direction)
 {
     char c;
     uint8_t row = 0, column, cr = lcd->row, cc = lcd->column, memaddr;
-    
-    //for (row = lcd->organization.rows - 1; row > 0; row--)
-//         for (column = 0; column < lcd->organization.columns; column)
-//         {
-//             memaddr = column + lcd->organization.addresses[row]; //Get char from current column/row
-//             c = lcd->buffer[memaddr];
-//             memaddr = column + lcd->organization.addresses[row + 1];
-//             lcd->buffer[memaddr] = c;
-//         }
+    //TODO: Vertical scroll
     lcdflushbuffer(lcd);
 }
 
@@ -248,12 +243,10 @@ void lcdinit(LcdData_t *lcd, lcd_topology topo)
     
     lcdcommand(lcd, lcd->displayfunction);
     
-    lcd->displaycontrol |= LCD_DC_DISPLAYON | LCD_DC_CURSOROFF | LCD_DC_CURSORBLINKOFF;
+    lcd->displaycontrol |= LCD_DC_DISPLAYON | LCD_DC_CURSOROFF | 
+			   LCD_DC_CURSORBLINKOFF;
     lcdcommand(lcd, lcd->displaycontrol);
-    
-    //lcd->displaymode |= LCD_EM_ENTRYRIGHT | LCD_EM_SHIFTDEC;
-    //command(lcd, lcd->displaymode);
-    
+      
     lcdclear(lcd);
     lcdhome(lcd);
     
