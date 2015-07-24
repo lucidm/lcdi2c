@@ -1,5 +1,8 @@
 #include "i2clcd8574.h"
 
+#define CRIT_BEG(d) if(down_interruptible(&d->sem)) return -ERESTARTSYS
+#define CRIT_END(d) up(&d->sem)
+
 static uint busno = 1;      //I2C Bus number
 static uint address = DEFAULT_CHIP_ADDRESS; //Device address
 static uint topo = LCD_DEFAULT_ORGANIZATION;
@@ -150,13 +153,12 @@ static struct file_operations lcdi2c_fops = {
 static ssize_t lcdi2c_reset(struct device* dev, struct device_attribute* attr, 
 			    const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0 && buf[0] == '1')
         lcdinit(data, topo);
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -164,13 +166,12 @@ static ssize_t lcdi2c_backlight(struct device* dev,
 				struct device_attribute* attr, 
 				const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0)
         lcdsetbacklight(data, (buf[0] == '1'));
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -179,13 +180,12 @@ static ssize_t lcdi2c_backlight_show(struct device *dev,
 {
     int count = 0;
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (buf)
         count = snprintf(buf, PAGE_SIZE, "%c", data->backlight ? '1' : '0');
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -193,8 +193,7 @@ static ssize_t lcdi2c_cursorpos(struct device* dev,
 				struct device_attribute* attr, 
 				const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count >= 2)
     {
@@ -202,7 +201,7 @@ static ssize_t lcdi2c_cursorpos(struct device* dev,
         lcdsetcursor(data, buf[0], buf[1]);
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -212,8 +211,7 @@ static ssize_t lcdi2c_cursorpos_show(struct device *dev,
 {
     ssize_t count = 0;
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (buf)
     {
@@ -222,7 +220,7 @@ static ssize_t lcdi2c_cursorpos_show(struct device *dev,
         buf[1] = data->row;
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -232,8 +230,7 @@ static ssize_t lcdi2c_data(struct device* dev,
 {
     uint8_t i, ic, ir, memaddr;
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0)
     {
@@ -250,7 +247,7 @@ static ssize_t lcdi2c_data(struct device* dev,
         lcdflushbuffer(data);
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -259,8 +256,7 @@ static ssize_t lcdi2c_data_show(struct device *dev,
 {
     uint8_t i=0, ic, ir, memaddr;
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (buf)
     {
@@ -273,7 +269,7 @@ static ssize_t lcdi2c_data_show(struct device *dev,
         }
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return LCD_BUFFER_SIZE;
 }
 
@@ -283,8 +279,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
     ssize_t count = 0;
     char tmp[12], lines[54];
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (buf)
     {
@@ -313,7 +308,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                         );
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -321,8 +316,7 @@ static ssize_t lcdi2c_cursor(struct device* dev,
 			     struct device_attribute* attr, 
 			     const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0)
     {
@@ -330,7 +324,7 @@ static ssize_t lcdi2c_cursor(struct device* dev,
         lcdcursor(data, data->cursor);
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -339,13 +333,12 @@ static ssize_t lcdi2c_cursor_show(struct device *dev,
 {
     int count = 0;
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (buf)
         count = snprintf(buf, PAGE_SIZE, "%c", data->cursor ? '1' : '0');
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -353,8 +346,7 @@ static ssize_t lcdi2c_blink(struct device* dev,
 			    struct device_attribute* attr, 
 			    const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0)
     {
@@ -362,7 +354,7 @@ static ssize_t lcdi2c_blink(struct device* dev,
         lcdblink(data, data->blink);
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -371,52 +363,48 @@ static ssize_t lcdi2c_blink_show(struct device *dev,
 {
     int count = 0;
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (buf)
         count = snprintf(buf, PAGE_SIZE, "%c", data->blink ? '1' : '0');
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
 static ssize_t lcdi2c_home(struct device* dev, struct device_attribute* attr, 
 			   const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0 && buf[0] == '1')
         lcdhome(data);
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
 static ssize_t lcdi2c_clear(struct device* dev, struct device_attribute* attr, 
 			    const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0 && buf[0] == '1')
         lcdclear(data);
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
 static ssize_t lcdi2c_scrollhz(struct device* dev, struct device_attribute* attr, 
 			       const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (count > 0)
         lcdscrollhoriz(data, buf[0] - '0');
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -425,15 +413,15 @@ static ssize_t lcdi2c_customchar(struct device* dev,
 				 const char* buf, size_t count)
 {
     uint8_t i;
+      
+    CRIT_BEG(data);
     
     if ((count > 0 && (count % 9)) || count == 0)
     {
          dev_err(&client->dev, "incomplete character bitmap definition\n");
+	 CRIT_END(data);
          return -ETOOSMALL;
     }
-    
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
     
     for (i = 0; i < count; i+=9)
     {
@@ -441,14 +429,14 @@ static ssize_t lcdi2c_customchar(struct device* dev,
         {
             dev_err(&client->dev, "character number %d can only have values"
 				  "starting from 0 to 7\n", buf[i]);
-            up(&data->sem);
+	    CRIT_END(data);
 	    return -ETOOSMALL;
         }
         
         lcdcustomchar(data, buf[i], buf + i + 1);
     }
     
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
@@ -457,8 +445,7 @@ static ssize_t lcdi2c_customchar_show(struct device *dev,
 {
     int count = 0, c, i;
     
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     for (c = 0; c < 8; c++)
     {
@@ -471,29 +458,44 @@ static ssize_t lcdi2c_customchar_show(struct device *dev,
         }
     }
        
-    up(&data->sem);
+    CRIT_END(data);
     return count;
 }
 
-static ssize_t lcdi2c_write(struct device* dev, 
+static ssize_t lcdi2c_char(struct device* dev, 
 				 struct device_attribute* attr, 
 				 const char* buf, size_t count)
 {
-    if(down_interruptible(&data->sem))
-        return -ERESTARTSYS;
+    CRIT_BEG(data);
     
     if (buf && count > 0)
     {
+      lcdsetcursor(data, data->column, data->row);
       lcdwrite(data, buf[0]);
     }
-    up(&data->sem);
+    
+    CRIT_END(data);
+    return 1;
+}
+
+static ssize_t lcdi2c_char_show(struct device *dev, 
+				struct device_attribute *attr, char *buf)
+{
+    uint8_t memaddr;
+    
+    CRIT_BEG(data);
+    
+    memaddr = (data->column + data->organization.addresses[data->row]) % LCD_BUFFER_SIZE;
+    buf[0] = data->buffer[memaddr];
+    
+    CRIT_END(data);
     return 1;
 }
 
 DEVICE_ATTR(reset, S_IWUSR | S_IWGRP, NULL, lcdi2c_reset);
 DEVICE_ATTR(backlight, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH,
 	    lcdi2c_backlight_show, lcdi2c_backlight);
-DEVICE_ATTR(cursorpos, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
+DEVICE_ATTR(position, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
 	    lcdi2c_cursorpos_show, lcdi2c_cursorpos);
 DEVICE_ATTR(data, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
 	    lcdi2c_data_show, lcdi2c_data);
@@ -507,13 +509,13 @@ DEVICE_ATTR(clear, S_IWUSR | S_IWGRP, NULL, lcdi2c_clear);
 DEVICE_ATTR(scrollhz, S_IWUSR | S_IWGRP, NULL, lcdi2c_scrollhz);
 DEVICE_ATTR(customchar, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
 	    lcdi2c_customchar_show, lcdi2c_customchar);
-DEVICE_ATTR(write, S_IWUSR | S_IWGRP, 
-	    NULL, lcdi2c_write);
+DEVICE_ATTR(character, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, 
+	    lcdi2c_char_show, lcdi2c_char );
 
 static const struct attribute *i2clcd_attrs[] = {
 	&dev_attr_reset.attr,
 	&dev_attr_backlight.attr,
-	&dev_attr_cursorpos.attr,
+	&dev_attr_position.attr,
 	&dev_attr_data.attr,
 	&dev_attr_meta.attr,
         &dev_attr_cursor.attr,
@@ -522,7 +524,7 @@ static const struct attribute *i2clcd_attrs[] = {
         &dev_attr_clear.attr,
         &dev_attr_scrollhz.attr,
         &dev_attr_customchar.attr,
-	&dev_attr_write.attr,
+	&dev_attr_character.attr,
 	NULL,
 };
 

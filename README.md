@@ -1,8 +1,10 @@
-Linux kernel module for alphanumeric LCDs on HD44780 with attached I2C expander based on PCF8574.
+Linux kernel module for alphanumeric LCDs on HD44780 with attached I2C expander 
+based on PCF8574 and its variants.
 
 The module requires kernel version 3.x or higher, access to I2C bus on destination machine 
-(module was tested on RaspberryPI 2 with kernel 4.1). It is currently able to drive one LCD at
-once, so you're forced to use only one LCD with this module.
+(module was tested on RaspberryPI 2 with kernel 4.1 and i2c_bcm2708 already loaded). 
+It is currently able to drive one LCD at once, so you're forced to use only one 
+LCD with this module.
 
 requirements
 ------------
@@ -44,18 +46,18 @@ testing
   PCF8574A with address range set to one of 0x38 - 0x4E, check your case, i2cdetect tool will be
   very helpful in case you don't really know what address your expander has.
   Last parameter describes actual LCD configuration, how many lines of text it has and how internal
-  memory of the display is organized. Not all configurartion are supported, but you can choose from
-  most popular ones.
-  Application will make some tests excpecting interaction from user, it didn't really check if LCD
+  memory of the display is organized. Not all configurartions are supported, but driver supports most
+  popular ones.
+  Application will make some tests excpecting interaction from user, there is no way to really check if LCD
   module reacts properly but you should see what's happening on LCD and know if something is wrong. 
   If everything went fine, you can excpect kernel module to work properly as well.
-* Binary for kernel module sits in same directory as the code, so to make module running you should run
+* Binaries for kernel module sits in same directory as the code, so to make module running you should run
   command insmod lcdi2c.ko with proper arguments which are described below.
 
   
 module arguments
 ----------------
-* Module expect some arguments to be set before loading. If none of them is given, module will be loaded
+* Module expect arguments to be set before loading. If none of them is given, module will be loaded
   with default values, which may, or may not be suitable for your particular LCD module. If you want to
   read more about module parameters please run command "modinfo lcdi2c.ko" which will display short description
   about module it self and arguments you can set.
@@ -81,8 +83,8 @@ device interface
 * Module has two sets of interfaces you can interact with your LCD. It registers /dev/lcdi2c character device, which you
   can open and manipulate using standard open/close/read/write/ioctl quintet or through /sys interface. However you
   are able to use /dev/lcdi2c device, /sys interface is preffered. 
-  Let's work out /sys interface first. After module was loaded into kernel, driver will register new class devices called
-  "/sys/class/alphalcd" in which named after the device file "lcdi2c"  directory will be created.
+  Let's work out /sys interface first. Once module is loaded into the kernel, driver will register new class devices called
+  "/sys/class/alphalcd" in which subdirectory "lcdi2c" will be created.
 * "/sys/class/alphalcd/lcdi2c" is the directory containing all interace files required to interact with LCD, here is
   alphabetically ordered list of files with short descritpiion:
   - backlight - write "0" to this file to switch backlight off, "1" to switch it on. You can read this file to get
@@ -92,8 +94,14 @@ device interface
   - clear     - write only, writting this file with value "1" will clear LCD.
   - cursor    - write "0" for swithich cursor off, "1" for switch cursor on. Reading this file will tell you about
                 current status of cursor.
-  - cursorpos - using this file will help you to set or read current cursor position. This is only file in which values
-                are actually binary in meaning of two bytes sent or read representing column and row number.
+  - customchar- HD44780 and its clones usually provide way to define 8 custom characters, this file will let you to
+                define those characters. This file is binary, each character consists of 9 bytes, first byte informs
+                about character number (characters have numbers from 0 to 7), next eight bytes is bitmap definition of
+                the character itself. Next 9 bytes repeats this pattern for next character. So total length of this file is
+                72 bytes. Writting to this file will make you able to define your own set of new 8 characters. If you want
+                to define new bitmat for a character, write at least 9 bytes, first byte is character number you'd like
+                to change, next 8 bytes defines bitmap of the character. You are allowed to define more than one character per
+                write, but keep in mind, you're always writting 9 * n bytes, where n is number of characters you define.
   - data      - driver uses internal buffer which is 1:1 internal LCD RAM mirror, everything you write to LCD through
                 driver interface will be represented in this file. You can also write to this file, and all that you wrote
                 would be display on the LCD. Keep in mind, size of RAM of LCD is limited only to 104 bytes.
@@ -107,6 +115,10 @@ device interface
   - dev       - description of major:minor device number associated with /dev/lcdi2c device file.
   - home      - writting "1" will cause LCD to move cursor to first column and row of LCD.
   - meta      - description of currently used LCD. You can only read this file to get current LCD configurartion.
+  - position  - this file will help you to set or read current cursor position. This file contains two bytes,
+	        value of first byte informs about current cursor position at column, second byte contain information
+	        about current cursor position at row. Writting two bytes to this file, will set cursor at position. 
+	        Reading it will tell you about current cursor position.
   - reset     - write only file, "1" write to this file will reset LCD to state after module was loaded.
   - scrollhz  - scroll horizontally, write "1" to this file to scroll content of LCD horizontally by 1 character to the right,
                 if you want to scroll to the left, write "0" to this file. This scrolling technique will not change internal RAM of

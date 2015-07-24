@@ -89,8 +89,8 @@ void lcdwrite(LcdData_t *lcd, uint8_t data)
 
 void lcdsetcursor(LcdData_t *lcd, uint8_t column, uint8_t row)
 {
-    lcd->column = (column >= lcd->organization.columns ? 0 : column);
-    lcd->row = (row >= lcd->organization.rows ? 0 : row);
+     lcd->column = (column >= lcd->organization.columns ? 0 : column);
+     lcd->row = (row >= lcd->organization.rows ? 0 : row);
     lcdcommand(lcd, LCD_DDRAM_SET | 
                     (lcd->column + lcd->organization.addresses[lcd->row]));
 }
@@ -144,10 +144,7 @@ void lcdscrollhoriz(LcdData_t *lcd, uint8_t direction)
 
 void lcdscrollvert(LcdData_t *lcd, uint8_t direction)
 {
-    char c;
-    uint8_t row = 0, column, cr = lcd->row, cc = lcd->column, memaddr;
     //TODO: Vertical scroll
-    lcdflushbuffer(lcd);
 }
 
 void lcdprint(LcdData_t *lcd, const char *data)
