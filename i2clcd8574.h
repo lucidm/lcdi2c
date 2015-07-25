@@ -131,9 +131,11 @@ typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
 #define DEVICE_MAJOR 0
 #define DEVICE_CLASS_NAME "alphalcd"
 #endif
-		   
-#define ITOMEMADDR(data, i)   ((i % data->organization.columns) + data->organization.addresses[(i / data->organization.columns)])
 
+#define ITOP(data, i, col, row) *(&col) = (uint8_t) ((i) % data->organization.columns); *(&row) = (uint8_t) ((i) / data->organization.columns)
+#define ITOMEMADDR(data, i)   (((i) % data->organization.columns) + data->organization.addresses[((i) / data->organization.columns)])
+#define PTOMEMADDR(data, col, row) ((col % data->organization.columns) + data->organization.addresses[(row % data->organization.rows)])
+		   
 typedef struct lcd_organization
 {
     uint8_t columns;

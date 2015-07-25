@@ -64,9 +64,9 @@ void lcdflushbuffer(LcdData_t *lcd)
 {
     uint8_t col = lcd->column, row = lcd->row, i;
 
-    for(i = 0; lcd->buffer[i] && i < LCD_BUFFER_SIZE; i++)
+    for(i = 0; i < (lcd->organization.columns * lcd->organization.rows); i++)
     {
-        lcdcommand(lcd, LCD_DDRAM_SET + i);
+        lcdcommand(lcd, LCD_DDRAM_SET + ITOMEMADDR(lcd, i));
         lcdsend(lcd, lcd->buffer[i], (1 << PIN_RS));
     }
     lcdsetcursor(lcd, col, row);
@@ -81,7 +81,7 @@ void lcdwrite(LcdData_t *lcd, uint8_t data)
 {
     uint8_t memaddr;
     
-    memaddr = (lcd->column + lcd->organization.addresses[lcd->row]) % LCD_BUFFER_SIZE;
+    memaddr = (lcd->column + (lcd->row * lcd->organization.columns)) % LCD_BUFFER_SIZE;
     lcd->buffer[memaddr] = data;
     
     lcdsend(lcd, data, (1 << PIN_RS));
@@ -91,8 +91,7 @@ void lcdsetcursor(LcdData_t *lcd, uint8_t column, uint8_t row)
 {
      lcd->column = (column >= lcd->organization.columns ? 0 : column);
      lcd->row = (row >= lcd->organization.rows ? 0 : row);
-    lcdcommand(lcd, LCD_DDRAM_SET | 
-                    (lcd->column + lcd->organization.addresses[lcd->row]));
+    lcdcommand(lcd, LCD_DDRAM_SET | PTOMEMADDR(lcd, lcd->column, lcd->row));
 }
 
 void lcdsetbacklight(LcdData_t *lcd, uint8_t backlight)
@@ -191,7 +190,7 @@ void lcdcustomchar(LcdData_t *lcd, uint8_t num, const uint8_t *bitmap)
     for(i = 0; i < 8; i++)
     {
         lcd->customchars[num][i] = bitmap[i];
-        lcdwrite(lcd, bitmap[i]);
+	lcdsend(lcd, bitmap[i], (1 << PIN_RS));
     }
 }
 

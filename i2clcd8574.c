@@ -77,7 +77,7 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
        
     while(i < length && i < LCD_BUFFER_SIZE)
     {    
-      put_user(data->buffer[ITOMEMADDR(data, i)], buffer++);
+      put_user(data->buffer[i], buffer++);
       data->devicefileptr++;
       i++;
     }
@@ -88,12 +88,16 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
 static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer, 
 			    size_t length, loff_t *offset)
 {
-    uint8_t i;
+    uint8_t i, memaddr, addr;
   
     CRIT_BEG(data, EBUSY);
-    for(i = 0; i < length && i < LCD_BUFFER_SIZE; i++)
+    
+    memaddr = data->column + (data->row * data->organization.columns); //Get current memory address
+    
+    for(i = 0; i < length; i++)
     {
-      get_user(data->buffer[ITOMEMADDR(data, i)], buffer + i);
+      addr = (memaddr + i) % (data->organization.columns * data->organization.rows);
+      get_user(data->buffer[addr], buffer + i);
     }
     lcdflushbuffer(data);
     CRIT_END(data);
@@ -257,23 +261,19 @@ static ssize_t lcdi2c_data(struct device* dev,
 			   struct device_attribute* attr, 
 			   const char* buf, size_t count)
 {
-    uint8_t i, ic, ir, memaddr;
+    uint8_t i, addr, memaddr;
     
     CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0)
     {
-        memset(data->buffer, 0x20, LCD_BUFFER_SIZE); //Fill buffer with spaces
-        for (i = 0; i < (count % LCD_BUFFER_SIZE); i++)
-        {
-            ic = i % data->organization.columns;
-            ir = i / data->organization.columns;
-            memaddr = ic + data->organization.addresses[ir];
-            data->buffer[memaddr] = buf[i];
-        }
-        
-        lcdhome(data);
-        lcdflushbuffer(data);
+	memaddr = data->column + (data->row * data->organization.columns); 
+	for(i = 0; i < count; i++)
+	{
+	  addr = (memaddr + i) % (data->organization.columns * data->organization.rows);
+	  data->buffer[addr] = buf[i];
+	}
+	lcdflushbuffer(data);        
     }
     
     CRIT_END(data);
@@ -291,7 +291,7 @@ static ssize_t lcdi2c_data_show(struct device *dev,
     {
         for (i = 0; i < LCD_BUFFER_SIZE; i++)
         {	    
-            buf[i] = data->buffer[ITOMEMADDR(data, i)];
+            buf[i] = data->buffer[i];
         }
     }
     
@@ -492,12 +492,17 @@ static ssize_t lcdi2c_char(struct device* dev,
 				 struct device_attribute* attr, 
 				 const char* buf, size_t count)
 {
+    uint8_t memaddr;
+    
     CRIT_BEG(data, ERESTARTSYS);
     
     if (buf && count > 0)
     {
-      lcdsetcursor(data, data->column, data->row);
+      memaddr = (1 + data->column + (data->row * data->organization.columns)) % LCD_BUFFER_SIZE;
       lcdwrite(data, buf[0]);
+      data->column = (memaddr % data->organization.columns);
+      data->row = (memaddr / data->organization.columns);
+      lcdsetcursor(data, data->column, data->row);
     }
     
     CRIT_END(data);
@@ -511,7 +516,7 @@ static ssize_t lcdi2c_char_show(struct device *dev,
     
     CRIT_BEG(data, ERESTARTSYS);
     
-    memaddr = (data->column + data->organization.addresses[data->row]) % LCD_BUFFER_SIZE;
+    memaddr = (data->column + (data->row * data->organization.columns)) % LCD_BUFFER_SIZE;
     buf[0] = data->buffer[memaddr];
     
     CRIT_END(data);

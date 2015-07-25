@@ -3,8 +3,8 @@ based on PCF8574 and its variants.
 
 The module requires kernel version 3.x or higher, access to I2C bus on destination machine 
 (module was tested on RaspberryPI 2 with kernel 4.1 and i2c_bcm2708 already loaded). 
-It is currently able to drive one LCD at once, so you're forced to use only one 
-LCD with this module.
+It is currently able to drive only one LCD at once, however you have a choice which LCD
+you would like to drive by this module using proper module option.
 
 requirements
 ------------
@@ -27,9 +27,9 @@ compilation
 * If you didn't make compilation of Kernel previously, go to Kernel source directory and
   run "make modules_prepare"
   
-* In the module directory open Makefile in your favourite editor and change
-  line "KDIR := ../../linux/linux" to "KDIR := <path to your kernel source>", and 
-  save Makefile. Now you can finally compile the module.
+* In the module directory open Makefile in your favourite text editor and change
+  line "KDIR := ../../linux/linux" to "KDIR := <path to your kernel source tree>", and 
+  save modified Makefile. Finally you can compile the module now.
   
 * To compile module run command "make" in module directory.
 
@@ -38,7 +38,7 @@ testing
 * Connect LCD to I2C interface on machine you'd like to test.
 
 * After successfully making proof application, you can run "proof" executable. Application
-  expects three numbers as arguments, I2C bus number, address of the device and LCD organization
+  expects three numbers as arguments, I2C bus number, address of the device and organization
   of connected LCD. You can call proof without parameters to display help and description how
   to set proper organization of LCD.
       Bus number depends on machine your LCD is connected to, some have more than one bus, other have
@@ -47,7 +47,7 @@ testing
   should be set to 0, while RaspberryPI 2, has bus enumarated starting from 1, hence device
   file is /dev/i2c-1 on RPI 2. 
       You should also set proper device address, it depends on type of the chip used in expander,
-  mostly you can expect two kind of them: PCF8574 which has defalt address range 0x20 - 0x27 and
+  mostly you can expect two kinds: PCF8574 which has defalt address range 0x20 - 0x27 and
   PCF8574A with address range set to one of 0x38 - 0x4E, check your case, i2cdetect tool will be
   very helpful in case you don't really know what address your expander has.
   Last parameter describes actual LCD configuration, how many lines of text it has and how internal
@@ -85,13 +85,14 @@ module arguments
 
 * blink  - 1 will blink current character position, 0 - blinking character will be disabled. Default set to 1
 
-* major  - driver will register new device in /dev/i2clcd, you can force major number of the device or leave it
-           for kernel to decide for you. Preffered is not to give this parameter and let the kernel decide.
-           You can later read this number form /sys
+* major  - driver will register new device in /dev/i2clcd, you can force major number of the device by using this 
+           configuration option or leave it for kernel to decide. 
+           Preffered is not to give this parameter and let the kernel decide. 
+           You can read it later form /sys
            
 * topo   - LCD topology, same as described in "testing" section. Default set to 4 (16x2).
 
-device interface
+/sys device interface
 ----------------
 * Module has two sets of interfaces you can interact with your LCD. It registers /dev/lcdi2c character device, which you
   can open and manipulate using standard open/close/read/write/ioctl quintet or through /sys interface. However you
@@ -150,5 +151,9 @@ device interface
                 your display, so "data" file will also keep its content intact. Opposite character which leave display during 
                 the scroll will appear on the on the other outermost position, so this scroll always keeps information on the screen.
                 This is the internal HD44780 mechanism.
-                
-  
+
+/dev/lcdi2c device interace
+---------------------------
+* Module has alternative interface to drive connected LCD. It registers /dev/lcdi2c device file, to which you're able to write or read from.
+  Typical method for accessing such devices is to use open() function, complementary close() function, read() and write() functions. To be able
+  to drive rest of features of HD44780 some ioctls commands are provided.
