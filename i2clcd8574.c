@@ -1,6 +1,6 @@
 #include "i2clcd8574.h"
 
-#define CRIT_BEG(d) if(down_interruptible(&d->sem)) return -ERESTARTSYS
+#define CRIT_BEG(d, error) if(down_interruptible(&d->sem)) return -error
 #define CRIT_END(d) up(&d->sem)
 
 static uint busno = 1;      //I2C Bus number
@@ -46,29 +46,57 @@ MODULE_PARM_DESC(topo, " Display organization, following values are currently su
 
 static int lcdi2c_open(struct inode *inode, struct file *file)
 {
-    printk(KERN_INFO "attepmting to open device\n");
+    CRIT_BEG(data, EBUSY);
+    
+    data->deviceopencnt++;
+    data->devicefileptr = 0;
     try_module_get(THIS_MODULE);
+    CRIT_END(data);
+    
     return SUCCESS;
 }
 
 static int lcdi2c_release(struct inode *inode, struct file *file)
 {
-    printk(KERN_INFO "attepmting to release device\n");
+    CRIT_BEG(data, EBUSY);
+    
+    data->deviceopencnt--;
+    
     module_put(THIS_MODULE);
+    CRIT_END(data);
     return SUCCESS;
 }
 
 static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer, 
 			   size_t length, loff_t *offset)
 {
-    printk(KERN_INFO "read device\n");
-    return length;
+    uint8_t i = 0;
+
+    if (data->devicefileptr == LCD_BUFFER_SIZE)
+      return 0;
+       
+    while(i < length && i < LCD_BUFFER_SIZE)
+    {    
+      put_user(data->buffer[ITOMEMADDR(data, i)], buffer++);
+      data->devicefileptr++;
+      i++;
+    }
+    
+    return i;
 }
 
 static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer, 
 			    size_t length, loff_t *offset)
 {
-    printk(KERN_INFO "write device\n");
+    uint8_t i;
+  
+    CRIT_BEG(data, EBUSY);
+    for(i = 0; i < length && i < LCD_BUFFER_SIZE; i++)
+    {
+      get_user(data->buffer[ITOMEMADDR(data, i)], buffer + i);
+    }
+    lcdflushbuffer(data);
+    CRIT_END(data);
     return length;
 }
 
@@ -90,6 +118,7 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
     data->backlight = 1;
     data->cursor = cursor;
     data->blink = blink;
+    data->deviceopencnt = 0;
 
     lcdinit(data, topo);
     lcdprint(data, "I2C HD44780 v 0.1.0\njarekzok@gmail.com");
@@ -153,7 +182,7 @@ static struct file_operations lcdi2c_fops = {
 static ssize_t lcdi2c_reset(struct device* dev, struct device_attribute* attr, 
 			    const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0 && buf[0] == '1')
         lcdinit(data, topo);
@@ -166,7 +195,7 @@ static ssize_t lcdi2c_backlight(struct device* dev,
 				struct device_attribute* attr, 
 				const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0)
         lcdsetbacklight(data, (buf[0] == '1'));
@@ -180,7 +209,7 @@ static ssize_t lcdi2c_backlight_show(struct device *dev,
 {
     int count = 0;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (buf)
         count = snprintf(buf, PAGE_SIZE, "%c", data->backlight ? '1' : '0');
@@ -193,7 +222,7 @@ static ssize_t lcdi2c_cursorpos(struct device* dev,
 				struct device_attribute* attr, 
 				const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count >= 2)
     {
@@ -211,7 +240,7 @@ static ssize_t lcdi2c_cursorpos_show(struct device *dev,
 {
     ssize_t count = 0;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (buf)
     {
@@ -230,7 +259,7 @@ static ssize_t lcdi2c_data(struct device* dev,
 {
     uint8_t i, ic, ir, memaddr;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0)
     {
@@ -254,18 +283,15 @@ static ssize_t lcdi2c_data(struct device* dev,
 static ssize_t lcdi2c_data_show(struct device *dev, 
 				struct device_attribute *attr, char *buf)
 {
-    uint8_t i=0, ic, ir, memaddr;
+    uint8_t i=0;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (buf)
     {
         for (i = 0; i < LCD_BUFFER_SIZE; i++)
-        {
-            ic = i % data->organization.columns;
-            ir = i / data->organization.columns;
-            memaddr = ic + data->organization.addresses[ir];
-            buf[i] = data->buffer[memaddr];
+        {	    
+            buf[i] = data->buffer[ITOMEMADDR(data, i)];
         }
     }
     
@@ -279,7 +305,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
     ssize_t count = 0;
     char tmp[12], lines[54];
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (buf)
     {
@@ -316,7 +342,7 @@ static ssize_t lcdi2c_cursor(struct device* dev,
 			     struct device_attribute* attr, 
 			     const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0)
     {
@@ -333,7 +359,7 @@ static ssize_t lcdi2c_cursor_show(struct device *dev,
 {
     int count = 0;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (buf)
         count = snprintf(buf, PAGE_SIZE, "%c", data->cursor ? '1' : '0');
@@ -346,7 +372,7 @@ static ssize_t lcdi2c_blink(struct device* dev,
 			    struct device_attribute* attr, 
 			    const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0)
     {
@@ -363,7 +389,7 @@ static ssize_t lcdi2c_blink_show(struct device *dev,
 {
     int count = 0;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (buf)
         count = snprintf(buf, PAGE_SIZE, "%c", data->blink ? '1' : '0');
@@ -375,7 +401,7 @@ static ssize_t lcdi2c_blink_show(struct device *dev,
 static ssize_t lcdi2c_home(struct device* dev, struct device_attribute* attr, 
 			   const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0 && buf[0] == '1')
         lcdhome(data);
@@ -387,7 +413,7 @@ static ssize_t lcdi2c_home(struct device* dev, struct device_attribute* attr,
 static ssize_t lcdi2c_clear(struct device* dev, struct device_attribute* attr, 
 			    const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0 && buf[0] == '1')
         lcdclear(data);
@@ -399,7 +425,7 @@ static ssize_t lcdi2c_clear(struct device* dev, struct device_attribute* attr,
 static ssize_t lcdi2c_scrollhz(struct device* dev, struct device_attribute* attr, 
 			       const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (count > 0)
         lcdscrollhoriz(data, buf[0] - '0');
@@ -414,7 +440,7 @@ static ssize_t lcdi2c_customchar(struct device* dev,
 {
     uint8_t i;
       
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if ((count > 0 && (count % 9)) || count == 0)
     {
@@ -445,7 +471,7 @@ static ssize_t lcdi2c_customchar_show(struct device *dev,
 {
     int count = 0, c, i;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     for (c = 0; c < 8; c++)
     {
@@ -466,7 +492,7 @@ static ssize_t lcdi2c_char(struct device* dev,
 				 struct device_attribute* attr, 
 				 const char* buf, size_t count)
 {
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     if (buf && count > 0)
     {
@@ -483,7 +509,7 @@ static ssize_t lcdi2c_char_show(struct device *dev,
 {
     uint8_t memaddr;
     
-    CRIT_BEG(data);
+    CRIT_BEG(data, ERESTARTSYS);
     
     memaddr = (data->column + data->organization.addresses[data->row]) % LCD_BUFFER_SIZE;
     buf[0] = data->buffer[memaddr];

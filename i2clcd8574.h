@@ -131,6 +131,8 @@ typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
 #define DEVICE_MAJOR 0
 #define DEVICE_CLASS_NAME "alphalcd"
 #endif
+		   
+#define ITOMEMADDR(data, i)   ((i % data->organization.columns) + data->organization.addresses[(i / data->organization.columns)])
 
 typedef struct lcd_organization
 {
@@ -161,6 +163,8 @@ typedef struct lcddata
     uint8_t displaymode;
     uint8_t buffer[LCD_BUFFER_SIZE];
     uint8_t customchars[8][8];
+    uint16_t deviceopencnt;
+    uint8_t devicefileptr;
 } LcdData_t;
 
 void _udelay_(uint32_t usecs);
