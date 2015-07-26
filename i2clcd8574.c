@@ -101,6 +101,11 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
       data->devicefileptr++;
       i++;
     }
+    
+    i %= (data->organization.columns * data->organization.rows);
+    ITOP(data, i, data->column, data->row);
+    lcdsetcursor(data, data->column, data->row);
+    (*offset) = i;
     CRIT_END(data);
     
     return i;
@@ -116,8 +121,8 @@ static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer,
     for(i = 0; i < length && i < (data->organization.columns * data->organization.rows); i++)
       get_user(str[i], buffer + i);
     str[i] = 0;
-    lcdprint(data, str);
-    
+    (*offset) = lcdprint(data, str);    
+
     CRIT_END(data);
     return i;
 }
@@ -205,6 +210,7 @@ static long lcdi2c_ioctl(struct file *file,
     case LCD_IOCTL_SETBACKLIGHT:
       get_user(ch, buffer);
       lcdsetbacklight(data, (ch == '1'));
+      break;
     case LCD_IOCTL_SCROLLHZ:
       get_user(ch, buffer);
       lcdscrollhoriz(data, ch - '0');

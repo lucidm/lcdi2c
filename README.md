@@ -109,7 +109,7 @@ module arguments
   - blink     - write "0" to switch blinking character off, "1" to switch it on. Reading this file will tell you 
                 about current status of blinking.
                 
-  - clear     - write only, writting "1" to this file will clear LCD.
+  - clear     - write only, writing "1" to this file will clear LCD.
   
   - cursor    - write "0" for switch display cursor off, "1" for switch cursor on. Reading this file will tell you about
                 current status of the cursor.
@@ -118,16 +118,16 @@ module arguments
                 define those characters. This file is binary, each character consists of 9 bytes, first byte informs
                 about character number (characters have numbers from 0 to 7), next eight bytes is bitmap definition of
                 the character itself. Next 9 bytes repeats this pattern for another character. Total length of this file is
-                72 bytes. Writting to this file will make you able to define your own set of new 8 characters. If you want
+                72 bytes. Writing to this file will make you able to define your own set of new 8 characters. If you want
                 to define new bitmat for a character, write at least 9 bytes, first byte is character number you'd like
                 to change, next 8 bytes defines bitmap of the character. You are allowed to define more than one character per
-                write, but keep in mind, you're always writting 9 * n bytes, where n is number of characters you'd like to define.
+                write, but keep in mind, you're always writing 9 * n bytes, where n is number of characters you'd like to define.
                 
   - data      - driver uses internal buffer which is 1:1 internal LCD RAM mirror, everything you write to LCD through
                 driver interface will be represented in this file. You can also write to this file, and all that you wrote
                 would be visible on the display. Keep in mind, size of RAM of LCD is limited only to 104 bytes.
                 Internal RAM organization depends on "topo" parameter, however reading this file will represent what is actually
-                on the screen, and writting to it will have 1:1 representation on the LCD, configuration of this buffer depends on
+                on the screen, and writing to it will have 1:1 representation on the LCD, configuration of this buffer depends on
                 current LCD display topology (for some displays, not all bytes in RAM are used to display data and it's true for
                 this buffer file too).
                 If you want to know more about this kind of displays RAM organization, please read link below
@@ -136,18 +136,18 @@ module arguments
                 
   - dev       - description of major:minor device number associated with /dev/lcdi2c device file.
   
-  - home      - writting "1" will cause LCD to move cursor to first column and row of LCD.
+  - home      - writing "1" will cause LCD to move cursor to first column and row of LCD.
   
   - meta      - description of currently used LCD. You can only read this file to get current LCD configurartion.
   
   - position  - this file will help you to set or read current cursor position. This file contains two bytes,
 	        value of first byte informs about current cursor position at column, second byte contain information
-	        about current cursor position at row. Writting two bytes to this file, will set cursor at position. 
+	        about current cursor position at row. Writing two bytes to this file, will set cursor at position. 
 	        
   - reset     - write only file, "1" write to this file will reset LCD to state after module was loaded.
   
   - scrollhz  - scroll horizontally, write "1" to this file to scroll content of LCD horizontally by 1 character to the right,
-                scrolling to the left is made by writting "0" to this file. This scrolling technique will not change contents of internal RAM of
+                scrolling to the left is made by writing "0" to this file. This scrolling technique will not change contents of internal RAM of
                 your display, so "data" file will also keep its content intact. Opposite character which leave display during 
                 the scroll will appear on the on the other outermost position, so this scroll always keeps information on the screen.
                 This is the internal HD44780 mechanism.
@@ -156,4 +156,26 @@ module arguments
 ---------------------------
 * Module has alternative interface to drive connected LCD. It registers /dev/lcdi2c device file, to which you're able to write or read from.
   Typical method for accessing such devices is to use open() function, complementary close() function, read() and write() functions. To be able
-  to drive rest of features of HD44780 some ioctls commands are provided.
+  to use rest of features of HD44780 some ioctls commands are provided. List of all suprted IOCTLS commands with codes is available through 
+  /sys/class/alphalcd/lcdi2c/meta file under IOCTLS: section. Command codes repeat functionality of /sys interface. However some are unavailable, like 
+  "meta" for example. Reading and writing to the device is also different, you should write to it using write() function and complementary read()
+  function to read data from device. Below is a list of supported IOCTL commands:
+  
+  CLEAR - writing "1" as argument of this ioctl, will clear the display
+  HOME  - writing "1" as argument of this ioctl, will move cursor to first column and row of the display
+  RESET - writing "1" will reset LCD to default
+  GETCHAR - this ioctl will return ASCII value of current character (character cursor is hovering at)
+  SETCHAR - this ioctl will set given ASCII character at position pointed by current cursor setting
+  GETPOSITION - will return current cursor position as two bytes, first is current column, second - current row
+  SETPOSITION - writing two bytes to this ioctl will set current cursor position on the display
+  GETBACKLIGHT - will return "0" if backlight is currently switched off, "1" otherwise
+  SETBACKLIGHT - "1" written to this ioctl will switch backlight on or if "0" is written, will switch it off
+  GETCURSOR - returns current cursor visibility status, "0" - invisible, "1" - visible
+  SETCURSOR - sets cursor visibility, "0" - invisible, "1" - visible
+  GETBLINK - returns blinking cursor status, "0" - cursors is not blinking, "1" - cursor is blinking
+  SETBLINK - sets or resets cursor blink, "0" - cursor will blink, "1" - cursor will not blink
+  SCROLLHZ - wrtting "0" to this ioctl will scroll screen to the left by one column, "1" - will scroll to the right
+  SETCUSTOMCHAR - allows to define new character map for given character number. This ioctl expects 9 bytes of data exactly, first byte is character number
+                  eight subsequent bytes defines actual bitmap of font. This control differs from "customchar" in a way, that you cannot send more than
+                  one character definition at once. If you want to define more than one character, just call this ioctl multiple times for each character
+                  you would like to define.

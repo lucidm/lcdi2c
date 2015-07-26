@@ -207,7 +207,7 @@ void lcdsetcursor(LcdData_t *lcd, uint8_t column, uint8_t row);
 void lcdsetbacklight(LcdData_t *lcd, uint8_t backlight);
 void lcdcursor(LcdData_t *lcd, uint8_t cursor);
 void lcdblink(LcdData_t *lcd, uint8_t blink);
-void lcdprint(LcdData_t *lcd, const char *data);
+uint8_t lcdprint(LcdData_t *lcd, const char *data);
 void lcdfinalize(LcdData_t *lcd);
 void lcdinit(LcdData_t *lcd, lcd_topology topo);
 void lcdhome(LcdData_t *lcd);

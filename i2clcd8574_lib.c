@@ -146,7 +146,7 @@ void lcdscrollvert(LcdData_t *lcd, uint8_t direction)
     //TODO: Vertical scroll
 }
 
-void lcdprint(LcdData_t *lcd, const char *data)
+uint8_t lcdprint(LcdData_t *lcd, const char *data)
 {
     int i = 0;
     
@@ -161,7 +161,7 @@ void lcdprint(LcdData_t *lcd, const char *data)
       } else if (data[i] == 0x08) //BS
       {
 	if (lcd->column > 0)
-	  lcd->column -=  - 1;
+	  lcd->column -= 1;
 	i++;
 	continue;
       }
@@ -173,6 +173,8 @@ void lcdprint(LcdData_t *lcd, const char *data)
       if (lcd->column == 0)
 	lcd->row = (lcd->row + 1) % lcd->organization.rows;
     }
+    
+    return (lcd->column + (lcd->row * lcd->organization.columns));
 }
 
 void lcdcustomchar(LcdData_t *lcd, uint8_t num, const uint8_t *bitmap)
