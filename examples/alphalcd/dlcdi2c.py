@@ -3,7 +3,6 @@ import os, fcntl, array, struct
 RDWR = 3
 WRITE = 1
 READ = 2
-SIZES = {1 : 'c', 2 : 'h', 4 : 'l', 8 : 'd'}
 
 class LcdI2C(object):
  
@@ -48,7 +47,7 @@ class LcdI2C(object):
 	raise AttributeError("IOCTL {0} can only be READ".format(name))
 
       
-      s = array.array('b')
+      s = array.array('B')
       if (nr & 2):
 	s.extend([ord(i) for i in value])
       else:
@@ -57,8 +56,7 @@ class LcdI2C(object):
       
       result = fcntl.ioctl(self.file, cmd, s)
       return result;
-	
-      
+
     else:
       object.__setattr__(self, name, value)
   
@@ -72,10 +70,10 @@ class LcdI2C(object):
       nr, typem, size, direction = self.__cmdparse(cmd)
       
       if (direction & READ) == 0:
-	raise AttributeError("IOCTL {0} can only be WRITE".format(name))
+	raise AttributeError("IOCTL {0} can only be WRITTEN".format(name))
       
-      buffer = struct.pack('bb', 0, 0)
-      result = struct.unpack('bb', fcntl.ioctl(self.file, cmd, buffer))
+      buffer = struct.pack('9B')
+      result = struct.unpack('9B', fcntl.ioctl(self.file, cmd, buffer))
       return result;
 
   
@@ -98,10 +96,6 @@ class LcdI2C(object):
 	self.file.close()
 	self.closed = True
     return isinstance(value, TypeError)
-  
-  def ioctl(self, cmd, arg):
-    if not self.closed:
-      return fcntl.ioctl(self.file, cmd, arg, 0)
   
 if __name__ == "__main__":
   lcd = LcdI2C("/dev/lcdi2c", "rwb+")
