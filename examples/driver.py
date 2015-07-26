@@ -11,7 +11,7 @@ FONTS = ( (6, 0x0,0x0,0x0,0x4,0x4,0x0,0x0,0x0),
 
   
 if __name__ == "__main__":
-  lcd = LcdI2C("/dev/lcdi2c", "rwb+")
+  lcd = LcdI2C(1, 0x27)
   
   with lcd as f:
     print(f.read(20))
@@ -46,6 +46,10 @@ if __name__ == "__main__":
       for i in range(20):
 	lcd.SETCUSTOMCHAR = FONTS[i % 2 + 4]
 	lcd.SCROLLHZ = '1'
+	time.sleep(0.2)
+      for i in range(20):
+	lcd.SETCUSTOMCHAR = FONTS[i % 2 + 4]
+	lcd.SCROLLHZ = '0'
 	time.sleep(0.2)
     
 

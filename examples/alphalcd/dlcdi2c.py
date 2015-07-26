@@ -1,4 +1,5 @@
 import os, fcntl, array, struct
+import errno
 
 RDWR = 3
 WRITE = 1
@@ -6,12 +7,19 @@ READ = 2
 
 class LcdI2C(object):
  
-  def __init__(self, name, mode):
+  def __init__(self, bus, address):
     self.ioctls = {}
-    self.name = name
-    self.mode = mode
+    self.mode = 'rwb+'
     self.closed = True
     self.softspace = 0
+
+    try:
+      f = open("/sys/bus/i2c/devices/{0}-{1:04x}/name".format(bus, address))
+      self.name = "/dev/{0}".format(f.read().strip())
+      f.close()
+    except OSError as e:
+      raise OSError("Cannot make out device path. Is lcdi2c module loaded?")
+    
     f = os.open("/sys/class/alphalcd/lcdi2c/meta", os.O_RDONLY)
     if f:
       meta = os.read(f, 512).rstrip().split("\n")
