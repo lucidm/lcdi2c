@@ -130,6 +130,29 @@ typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
 #define DEVICE_NAME "lcdi2c"
 #define DEVICE_MAJOR 0
 #define DEVICE_CLASS_NAME "alphalcd"
+
+#define LCD_IOCTL_BASE 0xF5
+//Binary argument
+#define IOCTLB (1)
+//Character argument 
+#define IOCTLC (2)
+#define LCD_IOCTL_GETCHAR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x01 << 2), char *)
+#define LCD_IOCTL_SETCHAR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x01 << 2), char *)
+#define LCD_IOCTL_GETPOSITION _IOR(LCD_IOCTL_BASE, IOCTLB | (0x03 << 2), char *)
+#define LCD_IOCTL_SETPOSITION _IOW(LCD_IOCTL_BASE, IOCTLB | (0x04 << 2), char *)
+#define LCD_IOCTL_RESET _IOW(LCD_IOCTL_BASE, IOCTLC | (0x05 << 2), char *)
+#define LCD_IOCTL_HOME  _IOW(LCD_IOCTL_BASE, IOCTLC | (0x06 << 2), char *)
+#define LCD_IOCTL_SETBACKLIGHT _IOW(LCD_IOCTL_BASE, IOCTLC | (0x07 << 2), char *)
+#define LCD_IOCTL_GETBACKLIGHT _IOR(LCD_IOCTL_BASE, IOCTLC | (0x07 <<2), char *)
+#define LCD_IOCTL_SETCURSOR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x08 << 2), char *)
+#define LCD_IOCTL_GETCURSOR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x08 << 2), char *)
+#define LCD_IOCTL_SETBLINK _IOW(LCD_IOCTL_BASE, IOCTLC | (0x09 << 2), char *)
+#define LCD_IOCTL_GETBLINK _IOR(LCD_IOCTL_BASE, IOCTLC | (0x09 << 2), char *)
+
+typedef struct ioctl_description {
+  uint32_t ioctlcode;
+  char	name[24];
+} IOCTLDescription_t;
 #endif
 
 #define ITOP(data, i, col, row) *(&col) = (uint8_t) ((i) % data->organization.columns); *(&row) = (uint8_t) ((i) / data->organization.columns)
@@ -153,6 +176,7 @@ typedef struct lcddata
     struct i2c_client *handle;
     struct device *device;
     struct semaphore sem;
+    int major;
 #endif
     LcdOrganization_t organization;
     uint8_t backlight;

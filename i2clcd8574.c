@@ -8,6 +8,21 @@ static uint address = DEFAULT_CHIP_ADDRESS; //Device address
 static uint topo = LCD_DEFAULT_ORGANIZATION;
 static uint cursor = 1;
 static uint blink = 1;
+static IOCTLDescription_t ioctls[] = {
+  { .ioctlcode = LCD_IOCTL_GETCHAR, .name = "GETCHAR", },
+  { .ioctlcode = LCD_IOCTL_SETCHAR, .name = "SETCHAR", },
+  { .ioctlcode = LCD_IOCTL_GETPOSITION, .name = "GETPOSITION" },
+  { .ioctlcode = LCD_IOCTL_SETPOSITION, .name = "SETPOSITION" },
+  { .ioctlcode = LCD_IOCTL_RESET, .name = "RESET" },
+  { .ioctlcode = LCD_IOCTL_HOME, .name = "HOME" },
+  { .ioctlcode = LCD_IOCTL_GETBACKLIGHT, .name = "GETBACKLIGHT" },
+  { .ioctlcode = LCD_IOCTL_SETBACKLIGHT, .name = "SETBACKLIGHT" },
+  { .ioctlcode = LCD_IOCTL_GETCURSOR, .name = "GETCURSOR" },
+  { .ioctlcode = LCD_IOCTL_SETCURSOR, .name = "SETCURSOR" },
+  { .ioctlcode = LCD_IOCTL_GETBLINK,  .name = "GETBLINK" },
+  { .ioctlcode = LCD_IOCTL_SETBLINK,  .name = "SETBLINK" },
+};
+
 
 static struct i2c_client *client;
 static struct i2c_adapter *adapter;
@@ -104,6 +119,80 @@ static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer,
     return length;
 }
 
+static long lcdi2c_ioctl(struct file *file, 
+			unsigned int ioctl_num,
+			unsigned long arg)
+{
+  
+  char *buffer = (char*)arg, ch;
+  uint8_t memaddr;
+  long status = SUCCESS;
+  
+  printk(KERN_INFO "buffer:0x%X\n", buffer);
+  
+  switch (ioctl_num)
+  {
+    case LCD_IOCTL_SETCHAR:
+      get_user(ch, buffer);
+      memaddr = (1 + data->column + (data->row * data->organization.columns)) % LCD_BUFFER_SIZE;
+      lcdwrite(data, ch);
+      data->column = (memaddr % data->organization.columns);
+      data->row = (memaddr / data->organization.columns);
+      lcdsetcursor(data, data->column, data->row);
+      break;
+    case LCD_IOCTL_GETCHAR:
+      memaddr = (data->column + (data->row * data->organization.columns)) % LCD_BUFFER_SIZE;
+      ch = data->buffer[memaddr];
+      put_user(ch, buffer);
+      break;
+    case LCD_IOCTL_GETPOSITION:
+      printk(KERN_INFO "GETPOSITION called\n");
+      put_user(data->column, buffer);
+      put_user(data->row, buffer+1);
+      break;
+    case LCD_IOCTL_SETPOSITION:
+      get_user(data->column, buffer);
+      get_user(data->row, buffer+1);
+      lcdsetcursor(data, data->column, data->row);
+      break;
+    case LCD_IOCTL_RESET:
+      get_user(ch, buffer);
+      if (ch == '1')
+	lcdinit(data, data->organization.topology);
+      break;
+    case LCD_IOCTL_HOME:
+      printk(KERN_INFO "HOME called\n");
+      get_user(ch, buffer);
+      if (ch == '1')
+	lcdhome(data);
+      break;
+    case LCD_IOCTL_GETCURSOR:
+      put_user(data->cursor ? '1' : '0', buffer);
+      break;
+    case LCD_IOCTL_SETCURSOR:
+      get_user(ch, buffer);
+      lcdcursor(data, (ch == '1'));
+      break;
+    case LCD_IOCTL_GETBLINK:
+      put_user(data->blink ? '1' : '0', buffer);
+      break;
+    case LCD_IOCTL_SETBLINK:
+      get_user(ch, buffer);
+      lcdblink(data, (ch == '1'));
+      break;
+    case LCD_IOCTL_GETBACKLIGHT:
+      put_user(data->backlight ? '1' : '0', buffer);
+      break;
+    case LCD_IOCTL_SETBACKLIGHT:
+      get_user(ch, buffer);
+      lcdsetbacklight(data, (ch == '1'));
+    default:
+      printk(KERN_INFO "Unknown IOCTL\n");
+      break;
+  }
+  
+  return status;
+}
 
 static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -123,6 +212,7 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
     data->cursor = cursor;
     data->blink = blink;
     data->deviceopencnt = 0;
+    data->major = major;
 
     lcdinit(data, topo);
     lcdprint(data, "I2C HD44780 v 0.1.0\njarekzok@gmail.com");
@@ -177,7 +267,7 @@ static struct i2c_driver lcdi2c_driver = {
 static struct file_operations lcdi2c_fops = {
 	.read = lcdi2c_fopread,
 	.write = lcdi2c_fopwrite,
-//	.ioctl = NULL, //lcdi2c_ioctl,
+	.unlocked_ioctl = lcdi2c_ioctl,
 	.open = lcdi2c_open,
 	.release = lcdi2c_release,
         .owner = THIS_MODULE,
@@ -286,17 +376,17 @@ static ssize_t lcdi2c_data_show(struct device *dev,
     uint8_t i=0;
     
     CRIT_BEG(data, ERESTARTSYS);
-    
+
     if (buf)
     {
-        for (i = 0; i < LCD_BUFFER_SIZE; i++)
+        for (i = 0; i < (data->organization.columns * data->organization.rows); i++)
         {	    
             buf[i] = data->buffer[i];
-        }
+        } 
     }
     
     CRIT_END(data);
-    return LCD_BUFFER_SIZE;
+    return (data->organization.columns * data->organization.rows);
 }
 
 static ssize_t lcdi2c_meta_show(struct device *dev, 
@@ -310,6 +400,8 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
     if (buf)
     {
         int i;
+	IOCTLDescription_t *ioctld;
+	
         memset(lines, 0, 54);
         for (i=0; i < data->organization.rows; i++)
         {
@@ -322,7 +414,8 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                          "Rows:%d\n"
                          "Columns:%d\n"
                          "Rows addresses:%s\n"
-                         "Pins:RS=%d RW=%d E=%d BCKLIGHT=%d D[4]=%d D[5]=%d D[6]=%d D[7]=%d\n", 
+                         "Pins:RS=%d RW=%d E=%d BCKLIGHT=%d D[4]=%d D[5]=%d D[6]=%d D[7]=%d\n"
+			 "IOCTLS:\n",
                          data->organization.toponame, 
                          data->organization.topology, 
                          data->organization.rows,
@@ -332,6 +425,14 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                          PIN_BACKLIGHTON,
                          PIN_DB4, PIN_DB5, PIN_DB6, PIN_DB7
                         );
+	
+ 	for(i=0; i < (sizeof(ioctls) / sizeof(IOCTLDescription_t)); i++)
+ 	{
+ 	  count += snprintf(lines, 54, "\t%s=0x%02X\n", ioctls[i].name, ioctls[i].ioctlcode);
+ 	  strncat(buf, lines, PAGE_SIZE);
+ 	}
+ 	
+	
     }
     
     CRIT_END(data);
@@ -571,7 +672,7 @@ static int __init i2clcd857_init(void)
                     .addr = address,
                     
     };
-    
+  
     adapter = i2c_get_adapter(busno);
     if (!adapter) return -EINVAL;
     
@@ -641,7 +742,7 @@ static int __init i2clcd857_init(void)
 
 
 static void __exit i2clcd857_exit(void)
-{
+{ 
     
     unregister_chrdev(major, DEVICE_NAME);
     

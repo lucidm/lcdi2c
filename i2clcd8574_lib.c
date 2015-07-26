@@ -216,7 +216,7 @@ void lcdinit(LcdData_t *lcd, lcd_topology topo)
     lcd->organization.toponame = toponames[topo];
     
     lcd->displaycontrol = 0;
-    lcd->displaymode = 0;
+    lcd->displaymode = 0; 
     
     lcd->displayfunction = LCD_FS_4BITDATA | LCD_FS_1LINE | LCD_FS_5x8FONT;
     if (lcd->organization.rows > 1)
