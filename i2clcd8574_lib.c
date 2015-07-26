@@ -148,36 +148,31 @@ void lcdscrollvert(LcdData_t *lcd, uint8_t direction)
 
 void lcdprint(LcdData_t *lcd, const char *data)
 {
-    int i = 0, row, col;
-    row = lcd->row;
-    col = lcd->column;
+    int i = 0;
     
-    while(i < LCD_BUFFER_SIZE && data[i] != 0)
+    while (i < (lcd->organization.columns * lcd->organization.rows) && data[i])
     {
-        if (data[i] == '\n')
-        {
-            col = 0;
-            row++;
-            i++;
-            continue;
-        }
-
-        if (col == 0)
-        {
-            lcdsetcursor(lcd, col, row);
-        }
-        
-        col = (col + 1) % lcd->organization.columns;
-        if (col == 0)
-            row = (row + 1) % lcd->organization.rows;
-
-        lcd->row = row;
-        lcd->column = col;
-        
-        lcdwrite(lcd, data[i]);
-        i++;
+      if (data[i] == '\n' || data[i] == '\r')
+      {
+	lcd->column = 0;
+	lcd->row = (lcd->row + 1) % lcd->organization.rows;
+	i++;
+	continue;
+      } else if (data[i] == 0x08) //BS
+      {
+	if (lcd->column > 0)
+	  lcd->column -=  - 1;
+	i++;
+	continue;
+      }
+      
+      lcdcommand(lcd, LCD_DDRAM_SET | PTOMEMADDR(lcd, lcd->column, lcd->row));
+      lcdwrite(lcd, data[i]);
+      i++;
+      lcd->column = (lcd->column + 1) % lcd->organization.columns;
+      if (lcd->column == 0)
+	lcd->row = (lcd->row + 1) % lcd->organization.rows;
     }
-    lcdsetcursor(lcd, col, row);
 }
 
 void lcdcustomchar(LcdData_t *lcd, uint8_t num, const uint8_t *bitmap)

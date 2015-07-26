@@ -5,12 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <linux/i2c-dev.h>
 #else
+#include <linux/string.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
@@ -148,7 +150,10 @@ typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
 #define LCD_IOCTL_GETCURSOR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x08 << 2), char *)
 #define LCD_IOCTL_SETBLINK _IOW(LCD_IOCTL_BASE, IOCTLC | (0x09 << 2), char *)
 #define LCD_IOCTL_GETBLINK _IOR(LCD_IOCTL_BASE, IOCTLC | (0x09 << 2), char *)
-
+#define LCD_IOCTL_SCROLLHZ _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0A << 2), char *)
+#define LCD_IOCTL_SETCUSTOMCHAR _IOW(LCD_IOCTL_BASE, IOCTLB | (0x0B << 2), char *)
+#define LCD_IOCTL_GETCUSTOMCHAR _IOR(LCD_IOCTL_BASE, IOCTLB | (0x0B << 2), char *)
+#define LCD_IOCTL_CLEAR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0C << 2), char *)
 typedef struct ioctl_description {
   uint32_t ioctlcode;
   char	name[24];

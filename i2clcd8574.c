@@ -21,6 +21,10 @@ static IOCTLDescription_t ioctls[] = {
   { .ioctlcode = LCD_IOCTL_SETCURSOR, .name = "SETCURSOR" },
   { .ioctlcode = LCD_IOCTL_GETBLINK,  .name = "GETBLINK" },
   { .ioctlcode = LCD_IOCTL_SETBLINK,  .name = "SETBLINK" },
+  { .ioctlcode = LCD_IOCTL_SCROLLHZ,  .name = "SCROLLHZ" },
+  { .ioctlcode = LCD_IOCTL_GETCUSTOMCHAR, .name = "GETCUSTOMCHAR" },
+  { .ioctlcode = LCD_IOCTL_SETCUSTOMCHAR, .name = "SETCUSTOMCHAR" },
+  { .ioctlcode = LCD_IOCTL_CLEAR, .name = "CLEAR" },
 };
 
 
@@ -87,15 +91,17 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
 {
     uint8_t i = 0;
 
-    if (data->devicefileptr == LCD_BUFFER_SIZE)
+    CRIT_BEG(data, EBUSY);
+    if (data->devicefileptr == (data->organization.columns * data->organization.rows))
       return 0;
        
-    while(i < length && i < LCD_BUFFER_SIZE)
+    while(i < length && i < (data->organization.columns * data->organization.rows))
     {    
       put_user(data->buffer[i], buffer++);
       data->devicefileptr++;
       i++;
     }
+    CRIT_END(data);
     
     return i;
 }
@@ -103,20 +109,33 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
 static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer, 
 			    size_t length, loff_t *offset)
 {
-    uint8_t i, memaddr, addr;
+    uint8_t i, str[81];
   
     CRIT_BEG(data, EBUSY);
+
+    for(i = 0; i < length && i < (data->organization.columns * data->organization.rows); i++)
+      get_user(str[i], buffer + i);
+    str[i] = 0;
+    lcdprint(data, str);
     
-    memaddr = data->column + (data->row * data->organization.columns); //Get current memory address
-    
-    for(i = 0; i < length; i++)
-    {
-      addr = (memaddr + i) % (data->organization.columns * data->organization.rows);
-      get_user(data->buffer[addr], buffer + i);
-    }
-    lcdflushbuffer(data);
     CRIT_END(data);
-    return length;
+    return i;
+}
+
+loff_t lcdi2c_lseek(struct file *file, loff_t offset, int orig)
+{
+  uint8_t memaddr, oldoffset;
+  
+  CRIT_BEG(data, EBUSY);
+  memaddr = data->column + (data->row * data->organization.columns);
+  oldoffset = memaddr;
+  memaddr = (memaddr + (uint8_t)offset) % (data->organization.rows * data->organization.columns);
+  data->column =  (memaddr % data->organization.columns);
+  data->row = (memaddr / data->organization.columns);
+  lcdsetcursor(data, data->column, data->row);
+  CRIT_END(data);
+  
+  return oldoffset;
 }
 
 static long lcdi2c_ioctl(struct file *file, 
@@ -124,11 +143,11 @@ static long lcdi2c_ioctl(struct file *file,
 			unsigned long arg)
 {
   
-  char *buffer = (char*)arg, ch;
-  uint8_t memaddr;
+  char *buffer = (char*)arg, ccb[10];
+  uint8_t memaddr, i, ch;
   long status = SUCCESS;
   
-  printk(KERN_INFO "buffer:0x%X\n", buffer);
+  CRIT_BEG(data, EAGAIN);
   
   switch (ioctl_num)
   {
@@ -186,10 +205,30 @@ static long lcdi2c_ioctl(struct file *file,
     case LCD_IOCTL_SETBACKLIGHT:
       get_user(ch, buffer);
       lcdsetbacklight(data, (ch == '1'));
+    case LCD_IOCTL_SCROLLHZ:
+      get_user(ch, buffer);
+      lcdscrollhoriz(data, ch - '0');
+      break;
+    case LCD_IOCTL_GETCUSTOMCHAR:
+      get_user(ch, buffer);
+      for (i=0; i<8; i++)
+	put_user(data->customchars[ch][i], buffer + i + 1);
+      break;
+    case LCD_IOCTL_SETCUSTOMCHAR:
+      for (i = 0; i < 9; i++)
+	get_user(ccb[i], buffer + i);
+      lcdcustomchar(data, ccb[0], ccb+1);
+      break;
+    case LCD_IOCTL_CLEAR:
+      get_user(ch, buffer);
+      if (ch == '1')
+	lcdclear(data);
+      break;
     default:
       printk(KERN_INFO "Unknown IOCTL\n");
       break;
   }
+  CRIT_END(data);
   
   return status;
 }
@@ -215,7 +254,7 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
     data->major = major;
 
     lcdinit(data, topo);
-    lcdprint(data, "I2C HD44780 v 0.1.0\njarekzok@gmail.com");
+    lcdprint(data, "I2C HD44780 v 0.1.0\nDisplay driver");
 
     dev_info(&client->dev, "%ux%u LCD using bus 0x%X, at address 0x%X", 
 	     data->organization.columns, 
@@ -239,13 +278,6 @@ static int lcdi2c_remove(struct i2c_client *client)
  * Driver data (common to all clients)
  */
 
-static const unsigned short normal_i2c[] = { DEFAULT_CHIP_ADDRESS, 
-					     DEFAULT_CHIP_ADDRESS + 1, 
-                                             DEFAULT_CHIP_ADDRESS + 2, 
-					     DEFAULT_CHIP_ADDRESS +3, 
-                                             I2C_CLIENT_END };
-        
-
 static const struct i2c_device_id lcdi2c_id[] = {
 	{ "lcdi2c", 0 },
         { },
@@ -260,13 +292,13 @@ static struct i2c_driver lcdi2c_driver = {
         .probe          = lcdi2c_probe,
         .remove         = lcdi2c_remove,
 	.id_table	= lcdi2c_id,
-	.address_list	= normal_i2c,
 };
 
 
 static struct file_operations lcdi2c_fops = {
 	.read = lcdi2c_fopread,
 	.write = lcdi2c_fopwrite,
+	.llseek = lcdi2c_lseek,
 	.unlocked_ioctl = lcdi2c_ioctl,
 	.open = lcdi2c_open,
 	.release = lcdi2c_release,
@@ -400,8 +432,6 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
     if (buf)
     {
         int i;
-	IOCTLDescription_t *ioctld;
-	
         memset(lines, 0, 54);
         for (i=0; i < data->organization.rows; i++)
         {
