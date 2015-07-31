@@ -49,6 +49,7 @@ typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
                    LCD_TOPO_16x2 = 4,
                    LCD_TOPO_16x1T1 = 5,
                    LCD_TOPO_16x1T2 = 6,
+		   LCD_TOPO_8x2 = 7,
                    } lcd_topology;
                    
 

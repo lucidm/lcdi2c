@@ -61,6 +61,7 @@ MODULE_PARM_DESC(topo, " Display organization, following values are currently su
                         "\t\t4 - 16x2\n"
                         "\t\t5 - 16x1 Type 1\n"
                         "\t\t6 - 16x1 Type 2\n"
+			"\t\t7 - 8x2\n"
                         "\t\tDefault set to 16x2");
 
 static int lcdi2c_open(struct inode *inode, struct file *file)
@@ -260,7 +261,7 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
     data->major = major;
 
     lcdinit(data, topo);
-    lcdprint(data, "I2C HD44780 v 0.1.0\nDisplay driver");
+    lcdprint(data, "HD44780\nDriver");
 
     dev_info(&client->dev, "%ux%u LCD using bus 0x%X, at address 0x%X", 
 	     data->organization.columns, 
