@@ -2,14 +2,20 @@
 
 //LCD topology description, first four bytes defines subsequent row of text addresses and how
 //are they mapped in internal RAM of LCD, last two bytes describes number of columns and number
-//of rows
+//of rows.
+//LCD_TOPO_16x1T1 is same as 8x2. RAM is divided in two areas by 8 bytes, left bytes
+//are starting from address 0x00, right hand half of LCD is starting from 0x40, that's
+//exactly how 8x2 LCD is organized. So this type of an LCD can be considered as 8x2 LCD with two
+//rows laying in the same line on both halfs of an LCD, instead both lines stacked on the top
+//of each other.
+//Type 2 of 16x1 has straighforward organization, first sixteen bytes representing a row on an LCD.
 static const uint8_t topoaddr[][6] ={{0x00, 0x40, 0x00, 0x00, 40, 2}, //LCD_TOPO_40x2
                                      {0x00, 0x40, 0x14, 0x54, 20, 4}, //LCD_TOPO_20x4
                                      {0x00, 0x40, 0x00, 0x00, 20, 2}, //LCD_TOPO_20x2
                                      {0x00, 0x40, 0x10, 0x50, 16, 4}, //LCD_TOPO_16x4
                                      {0x00, 0x40, 0x00, 0x00, 16, 2}, //LCD_TOPO_16x2
-                                     {0x00, 0x40, 0x00, 0x00, 16, 1}, //LCD_TOPO_16x1T1
-                                     {0x00, 0x00, 0x00, 0x00, 16, 1}, //LCD_TOPO_16x1T2
+                                     {0x00, 0x40, 0x00, 0x40, 8,  2}, //LCD_TOPO_16x1T1 
+                                     {0x00, 0x08, 0x00, 0x08, 16, 1}, //LCD_TOPO_16x1T2
 				     {0x00, 0x40, 0x00, 0x40, 8,  2}, //LCD_TOPO_8x2
                                     };
 
@@ -302,7 +308,9 @@ uint8_t lcdprint(LcdData_t *lcd, const char *data)
     {
       if (data[i] == '\n' || data[i] == '\r')
       {
-	lcd->column = 0;
+	if (lcd->organization.rows > 1) //For one-liners we do not reset column
+	                                //counter
+	  lcd->column = 0;
 	lcd->row = (lcd->row + 1) % lcd->organization.rows;
 	i++;
 	continue;
