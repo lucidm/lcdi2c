@@ -193,3 +193,10 @@ module arguments
                   eight subsequent bytes defines actual bitmap of font. This control differs from "customchar" in a way, that you cannot send more than
                   one character definition at once. If you want to define more than one character, just call this ioctl multiple times for each character
                   you would like to define.
+                  
+media
+-----
+  - https://youtu.be/CNj7ykGRBHw Module working with 8x2 LCD
+  - https://youtu.be/3B-uGth-hZk Module working with 16x2 LCD
+  - https://youtu.be/qbU7RORUYO8 Module working with 40x2 LCD
+  
