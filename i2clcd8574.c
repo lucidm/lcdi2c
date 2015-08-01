@@ -735,7 +735,7 @@ static int __init i2clcd857_init(void)
     major = register_chrdev(major, DEVICE_NAME, &lcdi2c_fops);
     if (major < 0)
     {
-        dev_warn(&client->dev, " failed to register device with error: %d\n", 
+        dev_warn(&client->dev, "failed to register device with error: %d\n", 
 		 major);
         goto failed_chrdev;
     }
@@ -743,7 +743,7 @@ static int __init i2clcd857_init(void)
     lcdi2c_class = class_create(THIS_MODULE, DEVICE_CLASS_NAME);
     if (IS_ERR(lcdi2c_class))
     {
-        dev_warn(&client->dev, " class creation failed %s\n", DEVICE_CLASS_NAME);
+        dev_warn(&client->dev, "class creation failed %s\n", DEVICE_CLASS_NAME);
         goto failed_class;
     }
 
@@ -751,17 +751,17 @@ static int __init i2clcd857_init(void)
 				  DEVICE_NAME);
     if (IS_ERR(lcdi2c_device))
     {
-        dev_warn(&client->dev, " device %s creation failed\n", DEVICE_NAME);
+        dev_warn(&client->dev, "device %s creation failed\n", DEVICE_NAME);
         goto failed_device;
     }
     
     if(sysfs_create_group(&lcdi2c_device->kobj, &i2clcd_device_attr_group))
     {
-        dev_warn(&client->dev, " device attribute group creation failed\n");
+        dev_warn(&client->dev, "device attribute group creation failed\n");
         goto failed_device;
     }
     
-     dev_info(&client->dev, " registered with major %u\n", major);
+     dev_info(&client->dev, "registered with major %u\n", major);
     
 
     return ret;
