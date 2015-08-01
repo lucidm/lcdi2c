@@ -161,21 +161,35 @@ module arguments
   "meta" for example. Reading and writing to the device is also different, you should write to it using write() function and complementary read()
   function to read data from device. Below is a list of supported IOCTL commands:
   
-  CLEAR - writing "1" as argument of this ioctl, will clear the display
-  HOME  - writing "1" as argument of this ioctl, will move cursor to first column and row of the display
-  RESET - writing "1" will reset LCD to default
-  GETCHAR - this ioctl will return ASCII value of current character (character cursor is hovering at)
-  SETCHAR - this ioctl will set given ASCII character at position pointed by current cursor setting
-  GETPOSITION - will return current cursor position as two bytes, first is current column, second - current row
-  SETPOSITION - writing two bytes to this ioctl will set current cursor position on the display
-  GETBACKLIGHT - will return "0" if backlight is currently switched off, "1" otherwise
-  SETBACKLIGHT - "1" written to this ioctl will switch backlight on or if "0" is written, will switch it off
-  GETCURSOR - returns current cursor visibility status, "0" - invisible, "1" - visible
-  SETCURSOR - sets cursor visibility, "0" - invisible, "1" - visible
-  GETBLINK - returns blinking cursor status, "0" - cursors is not blinking, "1" - cursor is blinking
-  SETBLINK - sets or resets cursor blink, "0" - cursor will blink, "1" - cursor will not blink
-  SCROLLHZ - wrtting "0" to this ioctl will scroll screen to the left by one column, "1" - will scroll to the right
-  SETCUSTOMCHAR - allows to define new character map for given character number. This ioctl expects 9 bytes of data exactly, first byte is character number
+  - CLEAR - writing "1" as argument of this ioctl, will clear the display
+  
+  - HOME  - writing "1" as argument of this ioctl, will move cursor to first column and row of the display
+  
+  - RESET - writing "1" will reset LCD to default
+  
+  - GETCHAR - this ioctl will return ASCII value of current character (character cursor is hovering at)
+  
+  - SETCHAR - this ioctl will set given ASCII character at position pointed by current cursor setting
+  
+  - GETPOSITION - will return current cursor position as two bytes, first is current column, second - current row
+  
+  - SETPOSITION - writing two bytes to this ioctl will set current cursor position on the display
+  
+  - GETBACKLIGHT - will return "0" if backlight is currently switched off, "1" otherwise
+  
+  - SETBACKLIGHT - "1" written to this ioctl will switch backlight on or if "0" is written, will switch it off
+  
+  - GETCURSOR - returns current cursor visibility status, "0" - invisible, "1" - visible
+  
+  - SETCURSOR - sets cursor visibility, "0" - invisible, "1" - visible
+  
+  - GETBLINK - returns blinking cursor status, "0" - cursors is not blinking, "1" - cursor is blinking
+  
+  - SETBLINK - sets or resets cursor blink, "0" - cursor will blink, "1" - cursor will not blink
+  
+  - SCROLLHZ - wrtting "0" to this ioctl will scroll screen to the left by one column, "1" - will scroll to the right
+  
+  - SETCUSTOMCHAR - allows to define new character map for given character number. This ioctl expects 9 bytes of data exactly, first byte is character number
                   eight subsequent bytes defines actual bitmap of font. This control differs from "customchar" in a way, that you cannot send more than
                   one character definition at once. If you want to define more than one character, just call this ioctl multiple times for each character
                   you would like to define.
