@@ -154,7 +154,7 @@ module arguments
 
 /dev/lcdi2c device interace
 ---------------------------
-* Module has alternative interface to drive connected LCD. It registers /dev/lcdi2c device file, to which you're able to write or read from.
+* Module has alternative interface to drive connected LCD. It registers /dev/lcdi2c device file, which you're able to write to or read from.
   Typical method for accessing such devices is to use open() function, complementary close() function, read() and write() functions. To be able
   to use rest of features of HD44780 some ioctls commands are provided. List of all suprted IOCTLS commands with codes is available through 
   /sys/class/alphalcd/lcdi2c/meta file under IOCTLS: section. Command codes repeat functionality of /sys interface. However some are unavailable, like 
@@ -165,13 +165,13 @@ module arguments
   
   - HOME  - writing "1" as argument of this ioctl, will move cursor to first column and row of the display
   
-  - RESET - writing "1" will reset LCD to default
+  - RESET - writing "1" will reset LCD to default state
   
   - GETCHAR - this ioctl will return ASCII value of current character (character cursor is hovering at)
   
   - SETCHAR - this ioctl will set given ASCII character at position pointed by current cursor setting
   
-  - GETPOSITION - will return current cursor position as two bytes, first is current column, second - current row
+  - GETPOSITION - will return current cursor position as two bytes, value of first byte represents current column, second one - current row
   
   - SETPOSITION - writing two bytes to this ioctl will set current cursor position on the display
   
