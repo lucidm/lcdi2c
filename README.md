@@ -1,17 +1,18 @@
-Linux kernel module for alphanumeric LCDs on HD44780 with attached I2C expander 
-based on PCF8574 and its variants.
+Linux kernel module for alphanumeric LCDs on HD44780 and I2C expander attached. 
+Module supports LCDs with PCF8574 based expanders attached.
 
 The module requires kernel version 3.x or higher, access to I2C bus on destination machine 
 (module was tested on RaspberryPI 2 with kernel 4.1 and i2c_bcm2708 already loaded). 
-It is currently able to drive only one LCD at once, however you have a choice which LCD
-you would like to drive by this module using proper module option.
+It is currently able to drive only one LCD at once, however you have a choice, which LCD
+you would like to drive by this module, using module option.
 
 requirements
 ------------
-* Currently running Linux Kernel and matched source in version 3.x or higher
-* Doing few changes in Makefile before compilation
-* Prepared Kernel source with proper configuration
-* Loaded kernel modules for i2c bus and i2c-dev if you want to test LCD before module
+* Running Linux Kernel and its source code. Version 3.x or higher is supported.
+* Doing some changes in Makefile before compilation 
+* Prepared Kernel source for modules compilation.
+* Already loaded kernel modules for i2c bus (for example i2c_bcm2708 module loaded if 
+  destination host machine is Raspberry Pi) and i2c-dev if you want to test LCD before module
   compilation.
 
 compilation
