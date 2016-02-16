@@ -1,17 +1,6 @@
 #ifndef _I2CLCD8574_H
 #define _I2CLCD8574_H
 
-#ifndef MODULE
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <linux/i2c-dev.h>
-#else
 #include <linux/string.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -38,7 +27,6 @@
 #include <linux/aio.h>
 #include <asm/uaccess.h>
 #include <linux/semaphore.h>
-#endif
 
 extern uint pinout[8];
 
@@ -129,7 +117,6 @@ typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
 #define LCD_READ            1
 #define LCD_WRITE           0
 
-#ifdef MODULE
 #define DEVICE_NAME "lcdi2c"
 #define DEVICE_MAJOR 0
 #define DEVICE_CLASS_NAME "alphalcd"
@@ -159,7 +146,6 @@ typedef struct ioctl_description {
   uint32_t ioctlcode;
   char	name[24];
 } IOCTLDescription_t;
-#endif
 
 #define ITOP(data, i, col, row) *(&col) = (uint8_t) ((i) % data->organization.columns); *(&row) = (uint8_t) ((i) / data->organization.columns)
 #define ITOMEMADDR(data, i)   (((i) % data->organization.columns) + data->organization.addresses[((i) / data->organization.columns)])
@@ -176,14 +162,11 @@ typedef struct lcd_organization
 
 typedef struct lcddata 
 {
-#ifndef MODULE
-    int handle;
-#else
     struct i2c_client *handle;
     struct device *device;
     struct semaphore sem;
     int major;
-#endif
+
     LcdOrganization_t organization;
     uint8_t backlight;
     uint8_t cursor;
@@ -218,16 +201,8 @@ void lcdscrollhoriz(LcdData_t *lcd, uint8_t direction);
 void lcdcustomchar(LcdData_t *lcd, uint8_t num, const uint8_t *bitmap);
 
 
-#ifndef MODULE
-#define LOWLEVEL_WRITE(file, data) write(file, &data, 1)
-#define USLEEP(usecs) _udelay_(usecs)
-#define MSLEEP(msecs) usleep(msecs * 1000)
-#else
 #define LOWLEVEL_WRITE(client, data) i2c_smbus_write_byte(client, data)
 #define USLEEP(usecs) _udelay_(usecs)
 #define MSLEEP(msecs) mdelay(msecs)
-#endif
-
-
 
 #endif
