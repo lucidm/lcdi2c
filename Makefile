@@ -1,7 +1,7 @@
 TARGET := lcdi2c
 TOOLS := /usr/bin
 PREFIX := 
-KDIR := ../../linux/linux
+KDIR := /lib/modules/$(shell uname -r)/source
 PWD := $(shell pwd)
 
 obj-m :=  $(TARGET).o
