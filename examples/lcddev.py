@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import time, random, sys, threading, signal
 from alphalcd.dlcdi2c import LcdI2C
 

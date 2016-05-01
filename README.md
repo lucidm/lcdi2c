@@ -3,13 +3,12 @@ Module supports LCDs with PCF8574 based expanders attached.
 
 The module requires kernel version 3.x or higher, access to I2C bus on destination machine 
 (module was tested on RaspberryPI 2 with kernel 4.1 and i2c_bcm2708 already loaded). 
-It is currently able to drive only one LCD at once, however you have a choice, which LCD
-you would like to drive by this module, using module option.
+It is currently able to drive only one LCD at once, however you have a choice which LCD
+you would like to drive by this module, using proper module option.
 
 requirements
 ------------
 * Running Linux Kernel and its source code. Version 3.x or higher is supported.
-* Doing some changes in Makefile before compilation 
 * Prepared Kernel source for modules compilation.
 * Already loaded kernel modules for i2c bus (for example i2c_bcm2708 module loaded if 
   destination host machine is Raspberry Pi) and i2c-dev if you want to test LCD before module
@@ -17,70 +16,49 @@ requirements
 
 compilation
 -----------
-* If you want to test your configuration and check if LCD is working properly, you can
-  make test application by running "make proof" command in driver directory.
-  For further information about testing connected LCD, please read "testing" entitled
-  part of this document.
-  
-* Make sure you have properly installed Linux Kernel source, with currently running kernel
-  configuration.
-  
-* If you didn't make compilation of Kernel previously, go to Kernel source directory and
-  run "make modules_prepare"
-  
-* In the module directory open Makefile in your favourite text editor and change
-  line "KDIR := ../../linux/linux" to "KDIR := <path to your kernel source tree>", and 
-  save modified Makefile. Finally you can compile the module now.
-  
-* To compile module run command "make" in module directory.
+* Before making module, make sure you have properly installed Linux Kernel source in your
+  system. Symlinks in /lib/modules/$(uname -r)/source and /lib/modules/$(uname -r)/build
+  should point to proper kernel source directory tree.
 
-testing
--------
-* Connect LCD to I2C interface on machine you'd like to test.
+* If you didn't prepare compilation of Kernel previously, go to /lib/modules/$(uname -r)/build
+  directory and run "make modules_prepare". 
 
-* After successfully making proof application, you can run "proof" executable. Application
-  expects three numbers as arguments, I2C bus number, address of the device and organization
-  of connected LCD. You can call proof without parameters to display help and description how
-  to set proper organization of LCD.
-      Bus number depends on machine your LCD is connected to, some have more than one bus, other have
-  only one but enumarated differently. For example, earlier version of RaspberryPI has I2C bus
-  enumerated starting from 0, so the device file will be /dev/i2c-0 and bus number in this case
-  should be set to 0, while RaspberryPI 2, has bus enumarated starting from 1, hence device
-  file is /dev/i2c-1 on RPI 2. 
-      You should also set proper device address, it depends on type of the chip used in expander,
-  mostly you can expect two kinds: PCF8574 which has defalt address range 0x20 - 0x27 and
-  PCF8574A with address range set to one of 0x38 - 0x4E, check your case, i2cdetect tool will be
-  very helpful in case you don't really know what address your expander has.
-  Last parameter describes actual LCD configuration, how many lines of text it has and how internal
-  memory of the display is organized. Not all configurartions are supported, but driver supports most
-  popular ones.
-      Application will make some tests excpecting interaction from user, there is no way to really check if LCD
-  module reacts properly but you should see what's happening on LCD and know if something is wrong. 
-  If everything went fine, you can excpect kernel module to work properly as well.
-  
-* Binaries for kernel module sits in same directory as the code, so to make module running you should run
-  command insmod lcdi2c.ko with proper arguments which are described below.
+* To make the module, go to the directory of the module and run commands:
+  make -C /lib/modules/`uname -r`/build M=$PWD
+  make -C /lib/modules/`uname -r`/build M=$PWD modules_install
 
-  
+  Sometimes, especially if you made the kernel using cross compilation, you get an error statement like:
+  "the KERNEL_SOURCE/scripts/recordmcount: Syntax error: "(" unexpected".
+  To fix this, got to /lib/modules/$(uname -r)/build on destination host (not the host you cross 
+  compiled kernel) and make:
+  make scripts
+  Then retry to make the module.
+
+* After successful compilation module will be installed in /lib/modules/$(uname -r)/extra and
+  you be able to modprobe lcdi2c
+
+* Go to examples and run 
+
 module arguments
 ----------------
 * Module expect arguments to be set before loading. If none of them is given, module will be loaded
-  with default values, which may, or may not be suitable for your particular LCD module. If you want to
-  read more about module parameters please run command "modinfo lcdi2c.ko" which will display short description
+  with default values, which may, or may not be suitable for your particular LCD back board. If you want to
+  read more about module parameters run command "modinfo lcdi2c" which will display short description
   about module it self and arguments you can set.
   
 * busno  - bus number, same as in proof application.
 
 * address - I2C expander address, default set to 0x27
 
-* pinout - array of number of pins, expander is connected to LCD. Not all expanders are configured the same, so you
-           can get different pin configurations, this parameter will help you to make this out. It's a list of
-           numbers representing pshysical pin number connected to your LCD in order RS,RW,E,BL,D4,D5,D6,D7.
+* pinout - array of number of pins configuration. Not all expanders are configured the same, so you
+           have to be prepared for different pin configurations, this parameter will help you to make this out. 
+           This parameter is a list of numbers representing pshysical pin number of the expander chip, 
+           connected to your LCD control lines in order given order: RS,RW,E,BL,D4,D5,D6,D7.
            So for example, if your expander pins are pshysically connected in following configuration:
               D4 = PIN.0, D5 = PIN.1, D6 = PIN.2, D7 = PIN.3, RS = PIN.4, RW = PIN.5, E = PIN.6, BL = PIN.7,
            you should set this argument to: 4,5,6,7,0,1,2,3. 
-           Pin BL is used for switching backlight of LCD. Default value is: 0,1,2,3,4,5,6,7 some popular cheap
-           expanders (usually with black solder mask on PCB) use this configurartion.
+           Pin BL is used for switching backlight of an LCD. Default value is: 0,1,2,3,4,5,6,7 some popular cheap
+           expanders (usually with black solder mask on PCB) use this pin configuration.
            
 * cursor - set to 1 will show cursor at start, 0 - will prevent from displaying the cursor. Default set to 1
 
@@ -89,16 +67,16 @@ module arguments
 * major  - driver will register new device in /dev/i2clcd, you can force major number of the device by using this 
            configuration option or leave it for kernel to decide. 
            Preffered is not to give this parameter and let the kernel decide. 
-           You can read it later form /sys
+           You can later read the number form /sys filesystem.
            
 * topo   - LCD topology, same as described in "testing" section. Default set to 4 (16x2).
 
 /sys device interface
 ----------------
 * Module has two sets of interfaces you can interact with your LCD. It registers /dev/lcdi2c character device, which you
-  can open and manipulate using standard open/close/read/write/ioctl quintet or through /sys interface. However you
+  can open and manipulate using standard open/close/read/write/ioctl quintet, or through /sys interface. However you
   are able to use /dev/lcdi2c device, /sys interface is preffered. 
-  Let's work out /sys interface first. Once module is loaded into the kernel, driver will register new class devices called
+  Let's work out /sys interface first. Once module is loaded, driver will register new class devices called
   "/sys/class/alphalcd" in which subdirectory "lcdi2c" will be created.
   
 * "/sys/class/alphalcd/lcdi2c" is the directory containing all interace files required to interact with LCD, here is
