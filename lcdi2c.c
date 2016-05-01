@@ -90,7 +90,7 @@ static int lcdi2c_release(struct inode *inode, struct file *file)
 static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer, 
 			   size_t length, loff_t *offset)
 {
-    uint8_t i = 0;
+    u8 i = 0;
 
     CRIT_BEG(data, EBUSY);
     if (data->devicefileptr == (data->organization.columns * data->organization.rows))
@@ -115,7 +115,7 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
 static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer, 
 			    size_t length, loff_t *offset)
 {
-    uint8_t i, str[81];
+    u8 i, str[81];
   
     CRIT_BEG(data, EBUSY);
 
@@ -130,12 +130,12 @@ static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer,
 
 loff_t lcdi2c_lseek(struct file *file, loff_t offset, int orig)
 {
-  uint8_t memaddr, oldoffset;
+  u8 memaddr, oldoffset;
   
   CRIT_BEG(data, EBUSY);
   memaddr = data->column + (data->row * data->organization.columns);
   oldoffset = memaddr;
-  memaddr = (memaddr + (uint8_t)offset) % (data->organization.rows * data->organization.columns);
+  memaddr = (memaddr + (u8)offset) % (data->organization.rows * data->organization.columns);
   data->column =  (memaddr % data->organization.columns);
   data->row = (memaddr / data->organization.columns);
   lcdsetcursor(data, data->column, data->row);
@@ -150,7 +150,7 @@ static long lcdi2c_ioctl(struct file *file,
 {
   
   char *buffer = (char*)arg, ccb[10];
-  uint8_t memaddr, i, ch;
+  u8 memaddr, i, ch;
   long status = SUCCESS;
   
   CRIT_BEG(data, EAGAIN);
@@ -390,7 +390,7 @@ static ssize_t lcdi2c_data(struct device* dev,
 			   struct device_attribute* attr, 
 			   const char* buf, size_t count)
 {
-    uint8_t i, addr, memaddr;
+    u8 i, addr, memaddr;
     
     CRIT_BEG(data, ERESTARTSYS);
     
@@ -412,7 +412,7 @@ static ssize_t lcdi2c_data(struct device* dev,
 static ssize_t lcdi2c_data_show(struct device *dev, 
 				struct device_attribute *attr, char *buf)
 {
-    uint8_t i=0;
+    u8 i=0;
     
     CRIT_BEG(data, ERESTARTSYS);
 
@@ -576,7 +576,7 @@ static ssize_t lcdi2c_customchar(struct device* dev,
 				 struct device_attribute* attr, 
 				 const char* buf, size_t count)
 {
-    uint8_t i;
+    u8 i;
       
     CRIT_BEG(data, ERESTARTSYS);
     
@@ -630,7 +630,7 @@ static ssize_t lcdi2c_char(struct device* dev,
 				 struct device_attribute* attr, 
 				 const char* buf, size_t count)
 {
-    uint8_t memaddr;
+    u8 memaddr;
     
     CRIT_BEG(data, ERESTARTSYS);
     
@@ -650,7 +650,7 @@ static ssize_t lcdi2c_char(struct device* dev,
 static ssize_t lcdi2c_char_show(struct device *dev, 
 				struct device_attribute *attr, char *buf)
 {
-    uint8_t memaddr;
+    u8 memaddr;
     
     CRIT_BEG(data, ERESTARTSYS);
     
@@ -805,7 +805,7 @@ static void __exit i2clcd857_exit(void)
 //rows laying in the same line on both halfs of an LCD, instead both lines stacked on the top
 //of each other.
 //Type 2 of 16x1 has straighforward organization, first sixteen bytes representing a row on an LCD.
-static const uint8_t topoaddr[][6] ={{0x00, 0x40, 0x00, 0x00, 40, 2}, //LCD_TOPO_40x2
+static const u8 topoaddr[][6] ={{0x00, 0x40, 0x00, 0x00, 40, 2}, //LCD_TOPO_40x2
                                      {0x00, 0x40, 0x14, 0x54, 20, 4}, //LCD_TOPO_20x4
                                      {0x00, 0x40, 0x00, 0x00, 20, 2}, //LCD_TOPO_20x2
                                      {0x00, 0x40, 0x10, 0x50, 16, 4}, //LCD_TOPO_16x4
@@ -831,7 +831,7 @@ static const char *toponames[] = {
 uint pinout[8] = {0,1,2,3,4,5,6,7}; //I2C module pinout configuration in order: 
                                     //RS,RW,E,BL,D4,D5,D6,D7
 
-void _udelay_(uint32_t usecs)
+void _udelay_(u32 usecs)
 {
     udelay(usecs);
 }
@@ -842,11 +842,11 @@ void _udelay_(uint32_t usecs)
  * given as parameter.
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t byte to send to LCD
+ * @param u8 byte to send to LCD
  * @return none
  * 
  */
-static void _buswrite(LcdData_t *lcd, uint8_t data)
+static void _buswrite(LcdData_t *lcd, u8 data)
 {
     data |= lcd->backlight ? (1 << PIN_BACKLIGHTON) : 0;
     LOWLEVEL_WRITE(lcd->handle, data);
@@ -856,11 +856,11 @@ static void _buswrite(LcdData_t *lcd, uint8_t data)
  * write a byte to i2c device, strobing EN pin of LCD
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t byte to send to LCD
+ * @param u8 byte to send to LCD
  * @return none
  * 
  */
-static void _strobe(LcdData_t *lcd, uint8_t data)
+static void _strobe(LcdData_t *lcd, u8 data)
 {
     _buswrite(lcd, data | (1 << PIN_EN));
     USLEEP(1);
@@ -872,11 +872,11 @@ static void _strobe(LcdData_t *lcd, uint8_t data)
  * write a byte using 4 bit interface
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t byte to send to LCD
+ * @param u8 byte to send to LCD
  * @return none
  * 
  */
-static void _write4bits(LcdData_t *lcd, uint8_t value)
+static void _write4bits(LcdData_t *lcd, u8 value)
 {
     _buswrite(lcd, value);
     _strobe(lcd, value);
@@ -887,15 +887,15 @@ static void _write4bits(LcdData_t *lcd, uint8_t value)
  * of 4 bits each.
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t byte to send to LCD
- * @param uint8_t mode of communication (RS line of a LCD)
+ * @param u8 byte to send to LCD
+ * @param u8 mode of communication (RS line of a LCD)
  * @return none
  * 
  */
-static void lcdsend(LcdData_t *lcd, uint8_t value, uint8_t mode)
+static void lcdsend(LcdData_t *lcd, u8 value, u8 mode)
 {
-    uint8_t highnib = value & 0xF0;
-    uint8_t lownib = value << 4;
+    u8 highnib = value & 0xF0;
+    u8 lownib = value << 4;
     
     _write4bits(lcd, (highnib) | mode);
     _write4bits(lcd, (lownib) | mode);
@@ -910,7 +910,7 @@ static void lcdsend(LcdData_t *lcd, uint8_t value, uint8_t mode)
  */
 void lcdflushbuffer(LcdData_t *lcd)
 {
-    uint8_t col = lcd->column, row = lcd->row, i;
+    u8 col = lcd->column, row = lcd->row, i;
 
     for(i = 0; i < (lcd->organization.columns * lcd->organization.rows); i++)
     {
@@ -924,11 +924,11 @@ void lcdflushbuffer(LcdData_t *lcd)
  * send command to a LCD. 
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t command byte to send
+ * @param u8 command byte to send
  * @return none
  * 
  */
-void lcdcommand(LcdData_t *lcd, uint8_t data)
+void lcdcommand(LcdData_t *lcd, u8 data)
 {
     lcdsend(lcd, data, 0);
 }
@@ -937,13 +937,13 @@ void lcdcommand(LcdData_t *lcd, uint8_t data)
  * write byte of data to LCD
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t data byte to send
+ * @param u8 data byte to send
  * @return none
  * 
  */
-void lcdwrite(LcdData_t *lcd, uint8_t data)
+void lcdwrite(LcdData_t *lcd, u8 data)
 {
-    uint8_t memaddr;
+    u8 memaddr;
     
     memaddr = (lcd->column + (lcd->row * lcd->organization.columns)) % LCD_BUFFER_SIZE;
     lcd->buffer[memaddr] = data;
@@ -958,12 +958,12 @@ void lcdwrite(LcdData_t *lcd, uint8_t data)
  * 
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t column number
- * @param uint8_t row number
+ * @param u8 column number
+ * @param u8 row number
  * @return none
  * 
  */
-void lcdsetcursor(LcdData_t *lcd, uint8_t column, uint8_t row)
+void lcdsetcursor(LcdData_t *lcd, u8 column, u8 row)
 {
      lcd->column = (column >= lcd->organization.columns ? 0 : column);
      lcd->row = (row >= lcd->organization.rows ? 0 : row);
@@ -974,12 +974,12 @@ void lcdsetcursor(LcdData_t *lcd, uint8_t column, uint8_t row)
  * switches backlight on or off.
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t false value switechs backlight off, otherwise backlight will
+ * @param u8 false value switechs backlight off, otherwise backlight will
  *                be switched on
  * @return none
  * 
  */
-void lcdsetbacklight(LcdData_t *lcd, uint8_t backlight)
+void lcdsetbacklight(LcdData_t *lcd, u8 backlight)
 {
     lcd->backlight = backlight ? 1 : 0;
     _buswrite(lcd, lcd->backlight ? (1 << PIN_BACKLIGHTON) : 0);
@@ -989,11 +989,11 @@ void lcdsetbacklight(LcdData_t *lcd, uint8_t backlight)
  * switches visibility of cursor on or off
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t false will switch it off, otherwise it will be switched on
+ * @param u8 false will switch it off, otherwise it will be switched on
  * @return none
  * 
  */
-void lcdcursor(LcdData_t *lcd, uint8_t cursor)
+void lcdcursor(LcdData_t *lcd, u8 cursor)
 {
     if (cursor)
         lcd->displaycontrol |= LCD_CURSOR;
@@ -1007,11 +1007,11 @@ void lcdcursor(LcdData_t *lcd, uint8_t cursor)
  * switch blink of a cursor on or of
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t false will switch it off, otherwise it will be switched on
+ * @param u8 false will switch it off, otherwise it will be switched on
  * @return none
  * 
  */
-void lcdblink(LcdData_t *lcd, uint8_t blink)
+void lcdblink(LcdData_t *lcd, u8 blink)
 {
     if (blink)
         lcd->displaycontrol |= LCD_BLINK;
@@ -1057,11 +1057,11 @@ void lcdclear(LcdData_t *lcd)
  * buffer of host stays intact as well
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t direction of a scroll, true - right, false - left
+ * @param u8 direction of a scroll, true - right, false - left
  * @return none
  * 
  */
-void lcdscrollhoriz(LcdData_t *lcd, uint8_t direction)
+void lcdscrollhoriz(LcdData_t *lcd, u8 direction)
 {
     lcdcommand(lcd, LCD_DS_SHIFTDISPLAY | 
 	      (direction ? LCD_DS_SHIFTRIGHT : LCD_DS_SHIFTLEFT));
@@ -1073,7 +1073,7 @@ void lcdscrollhoriz(LcdData_t *lcd, uint8_t direction)
  * @param LcdData_t* lcd handler structure address
  * 
  */
-void lcdscrollvert(LcdData_t *lcd, uint8_t direction)
+void lcdscrollvert(LcdData_t *lcd, u8 direction)
 {
     //TODO: Vertical scroll
 }
@@ -1089,10 +1089,10 @@ void lcdscrollvert(LcdData_t *lcd, uint8_t direction)
  * 
  * @param LcdData_t* lcd handler structure address
  * @param char* data 0 terinated string 
- * @return uint8_t bytes written
+ * @return u8 bytes written
  * 
  */
-uint8_t lcdprint(LcdData_t *lcd, const char *data)
+u8 lcdprint(LcdData_t *lcd, const char *data)
 {
     int i = 0;
     
@@ -1129,14 +1129,14 @@ uint8_t lcdprint(LcdData_t *lcd, const char *data)
  * alows to define custom character. It is feature of HD44780 controller.
  * 
  * @param LcdData_t* lcd handler structure address
- * @param uint8_t character number to define 0-7
- * @param uint8_t* array of 8 bytes of bitmap definition
+ * @param u8 character number to define 0-7
+ * @param u8* array of 8 bytes of bitmap definition
  * @return none
  * 
  */
-void lcdcustomchar(LcdData_t *lcd, uint8_t num, const uint8_t *bitmap)
+void lcdcustomchar(LcdData_t *lcd, u8 num, const u8 *bitmap)
 {
-    uint8_t i;
+    u8 i;
     
     num &= 0x07;
     lcdcommand(lcd, LCD_CGRAM_SET | (num << 3));

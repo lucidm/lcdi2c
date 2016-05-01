@@ -1,6 +1,7 @@
 #ifndef _I2CLCD8574_H
 #define _I2CLCD8574_H
 
+#include <linux/types.h>
 #include <linux/string.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -147,15 +148,15 @@ typedef struct ioctl_description {
   char	name[24];
 } IOCTLDescription_t;
 
-#define ITOP(data, i, col, row) *(&col) = (uint8_t) ((i) % data->organization.columns); *(&row) = (uint8_t) ((i) / data->organization.columns)
+#define ITOP(data, i, col, row) *(&col) = (u8) ((i) % data->organization.columns); *(&row) = (u8) ((i) / data->organization.columns)
 #define ITOMEMADDR(data, i)   (((i) % data->organization.columns) + data->organization.addresses[((i) / data->organization.columns)])
 #define PTOMEMADDR(data, col, row) ((col % data->organization.columns) + data->organization.addresses[(row % data->organization.rows)])
 		   
 typedef struct lcd_organization
 {
-    uint8_t columns;
-    uint8_t rows;
-    uint8_t addresses[4];
+    u8 columns;
+    u8 rows;
+    u8 addresses[4];
     lcd_topology topology;
     const char *toponame;
 } LcdOrganization_t;
@@ -168,37 +169,37 @@ typedef struct lcddata
     int major;
 
     LcdOrganization_t organization;
-    uint8_t backlight;
-    uint8_t cursor;
-    uint8_t blink;
-    uint8_t column;
-    uint8_t row;
-    uint8_t displaycontrol;
-    uint8_t displayfunction;
-    uint8_t displaymode;
-    uint8_t buffer[LCD_BUFFER_SIZE];
-    uint8_t customchars[8][8];
-    uint16_t deviceopencnt;
-    uint8_t devicefileptr;
+    u8 backlight;
+    u8 cursor;
+    u8 blink;
+    u8 column;
+    u8 row;
+    u8 displaycontrol;
+    u8 displayfunction;
+    u8 displaymode;
+    u8 buffer[LCD_BUFFER_SIZE];
+    u8 customchars[8][8];
+    u16 deviceopencnt;
+    u8 devicefileptr;
 } LcdData_t;
 
-void _udelay_(uint32_t usecs);
+void _udelay_(u32 usecs);
 
 void lcdflushbuffer(LcdData_t *lcd);
-void lcdcommand(LcdData_t *lcd, uint8_t data);
-void lcdwrite(LcdData_t *lcd, uint8_t data);
-void lcdsetcursor(LcdData_t *lcd, uint8_t column, uint8_t row);
-void lcdsetbacklight(LcdData_t *lcd, uint8_t backlight);
-void lcdcursor(LcdData_t *lcd, uint8_t cursor);
-void lcdblink(LcdData_t *lcd, uint8_t blink);
-uint8_t lcdprint(LcdData_t *lcd, const char *data);
+void lcdcommand(LcdData_t *lcd, u8 data);
+void lcdwrite(LcdData_t *lcd, u8 data);
+void lcdsetcursor(LcdData_t *lcd, u8 column, u8 row);
+void lcdsetbacklight(LcdData_t *lcd, u8 backlight);
+void lcdcursor(LcdData_t *lcd, u8 cursor);
+void lcdblink(LcdData_t *lcd, u8 blink);
+u8 lcdprint(LcdData_t *lcd, const char *data);
 void lcdfinalize(LcdData_t *lcd);
 void lcdinit(LcdData_t *lcd, lcd_topology topo);
 void lcdhome(LcdData_t *lcd);
 void lcdclear(LcdData_t *lcd);
-void lcdscrollvert(LcdData_t *lcd, uint8_t direction);
-void lcdscrollhoriz(LcdData_t *lcd, uint8_t direction);
-void lcdcustomchar(LcdData_t *lcd, uint8_t num, const uint8_t *bitmap);
+void lcdscrollvert(LcdData_t *lcd, u8 direction);
+void lcdscrollhoriz(LcdData_t *lcd, u8 direction);
+void lcdcustomchar(LcdData_t *lcd, u8 num, const u8 *bitmap);
 
 
 #define LOWLEVEL_WRITE(client, data) i2c_smbus_write_byte(client, data)
