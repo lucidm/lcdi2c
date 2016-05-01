@@ -17,27 +17,29 @@ requirements
 compilation
 -----------
 * Before making module, make sure you have properly installed Linux Kernel source in your
-  system. Symlinks in /lib/modules/$(uname -r)/source and /lib/modules/$(uname -r)/build
+  system. Symlinks in */lib/modules/$(uname -r)/source* and */lib/modules/$(uname -r)/build*
   should point to proper kernel source directory tree.
 
-* If you didn't prepare compilation of Kernel previously, go to /lib/modules/$(uname -r)/build
-  directory and run "make modules_prepare". 
+* If you didn't prepare compilation of Kernel previously, go to */lib/modules/$(uname -r)/build*
+  directory and run:
+  *make modules_prepare*. 
 
 * To make the module, go to the directory of the module and run commands:
-  make -C /lib/modules/`uname -r`/build M=$PWD
-  make -C /lib/modules/`uname -r`/build M=$PWD modules_install
+  *make -C /lib/modules/$(uname -r)/build M=$PWD*
+  *make -C /lib/modules/$(uname -r)/build M=$PWD modules_install*
 
   Sometimes, especially if you made the kernel using cross compilation, you get an error statement like:
   "the KERNEL_SOURCE/scripts/recordmcount: Syntax error: "(" unexpected".
-  To fix this, got to /lib/modules/$(uname -r)/build on destination host (not the host you cross 
+  To fix this, got to */lib/modules/$(uname -r)/build* on destination host (not the host you cross 
   compiled kernel) and make:
   make scripts
   Then retry to make the module.
 
-* After successful compilation module will be installed in /lib/modules/$(uname -r)/extra and
+* After successful compilation module will be installed in */lib/modules/$(uname -r)/extra* and
   you be able to modprobe lcdi2c
 
 * Go to examples and run 
+  *python lcddev.py*
 
 module arguments
 ----------------
