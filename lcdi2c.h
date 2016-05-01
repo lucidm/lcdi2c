@@ -1,7 +1,6 @@
 #ifndef _I2CLCD8574_H
 #define _I2CLCD8574_H
 
-#include <linux/types.h>
 #include <linux/string.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
