@@ -84,8 +84,8 @@ module arguments
 * "/sys/class/alphalcd/lcdi2c" is the directory containing all interace files required to interact with LCD, here is
   alphabetically ordered list of files with short descritpiion:
   
-  - backlight - write "0" to this file to switch backlight off, "1" to switch it on. You can read a byte from 
-                this file to get current status of backlight.
+  - brighness - write "0" to this file to switch backlight off, any value different from 0 up to 255 will switch 
+                backlight on.
                 
   - blink     - write "0" to switch blinking character off, "1" to switch it on. Reading this file will tell you 
                 about current status of blinking.
