@@ -8,6 +8,9 @@ static uint address = DEFAULT_CHIP_ADDRESS; //Device address
 static uint topo = LCD_DEFAULT_ORGANIZATION;
 static uint cursor = 1;
 static uint blink = 1;
+static uint showmsg = 1;
+static char* msg = "HD44780\nDriver";
+
 static IOCTLDescription_t ioctls[] = {
   { .ioctlcode = LCD_IOCTL_GETCHAR, .name = "GETCHAR", },
   { .ioctlcode = LCD_IOCTL_SETCHAR, .name = "SETCHAR", },
@@ -41,6 +44,8 @@ module_param(address, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param_array(pinout, uint, NULL, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(cursor, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(blink, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+module_param(showmsg, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+module_param(msg, charp, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(topo, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(major, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 
@@ -52,6 +57,8 @@ MODULE_PARM_DESC(pinout, " I2C module pinout configuration, eight "
 			 "\t\tdefault 0,1,2,3,4,5,6,7");
 MODULE_PARM_DESC(cursor, " Show cursor at start 1 - Yes, 0 - No, default 1");
 MODULE_PARM_DESC(blink, " Blink cursor 1 - Yes, 0 - No, defualt 1");
+MODULE_PARM_DESC(showmsg, " Show message on init, 1 - Yes, 0 - 0, default 1");
+MODULE_PARM_DESC(msg, " Inital message, default \"HD44780 Driver\"");
 MODULE_PARM_DESC(major, " Device major number, default 0");
 MODULE_PARM_DESC(topo, " Display organization, following values are currently supported:\n"
                         "\t\t0 - 40x2\n"
@@ -261,7 +268,9 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
     data->major = major;
 
     lcdinit(data, topo);
-    lcdprint(data, "HD44780\nDriver");
+    if (showmsg && strlen(msg)) {
+        lcdprint(data, msg);
+    }
 
     dev_info(&client->dev, "%ux%u LCD using bus 0x%X, at address 0x%X",
 	     data->organization.columns,
@@ -803,9 +812,6 @@ static int __init i2clcd857_init(void)
 
 static void __exit i2clcd857_exit(void)
 {
-
-    unregister_chrdev(major, DEVICE_NAME);
-
     sysfs_remove_group(&lcdi2c_device->kobj, &i2clcd_device_attr_group);
     device_destroy(lcdi2c_class, MKDEV(major, 0));
     class_unregister(lcdi2c_class);

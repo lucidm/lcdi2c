@@ -17,29 +17,43 @@ requirements
 compilation
 -----------
 * Before making module, make sure you have properly installed Linux Kernel source in your
-  system. Symlinks in */lib/modules/$(uname -r)/source* and */lib/modules/$(uname -r)/build*
-  should point to proper kernel source directory tree.
+  system.
+  ``` bash
+  # These symlinks should point to a proper kernel source directory tree.
+  $ ls -lF /lib/modules/$(uname -r)/source
+  $ ls -lF /lib/modules/$(uname -r)/build
+  ```
 
-* If you didn't prepare compilation of Kernel previously, go to */lib/modules/$(uname -r)/build*
-  directory and run:
-  *make modules_prepare*. 
+* An easy way of installing the correct Linux Kernel source on Raspberry Pi is via the
+  `rpi-source` utility https://github.com/notro/rpi-source/wiki. This will also set
+  up the correct symlinks.
+
+* If you didn't prepare compilation of Kernel previously (you can skip this if using
+  `rpi-source`):
+  
+  ```bash
+  $ cd /lib/modules/$(uname -r)/build
+  $ make modules_prepare
+  ```
 
 * To make the module, go to the directory of the module and run commands:
-  *make -C /lib/modules/$(uname -r)/build M=$PWD*
-  *make -C /lib/modules/$(uname -r)/build M=$PWD modules_install*
-
+  ```bash
+  $ make -C /lib/modules/$(uname -r)/build M=$PWD
+  $ make -C /lib/modules/$(uname -r)/build M=$PWD modules_install
+  ```
   Sometimes, especially if you made the kernel using cross compilation, you get an error statement like:
-  "the KERNEL_SOURCE/scripts/recordmcount: Syntax error: "(" unexpected".
-  To fix this, got to */lib/modules/$(uname -r)/build* on destination host (not the host you cross 
+  ```
+  the KERNEL_SOURCE/scripts/recordmcount: Syntax error: "(" unexpected.
+  ```
+  To fix this, got to `/lib/modules/$(uname -r)/build` on destination host (not the host you cross 
   compiled kernel) and make:
-  make scripts
+  `make scripts`.
   Then retry to make the module.
 
-* After successful compilation module will be installed in */lib/modules/$(uname -r)/extra* and
-  you be able to modprobe lcdi2c
+* After successful compilation module will be installed in `/lib/modules/$(uname -r)/extra` and
+  you be able to `modprobe lcdi2c`
 
-* Go to examples and run 
-  *python lcddev.py*
+* Go to examples and run `python lcddev.py`
 
 module arguments
 ----------------
@@ -65,6 +79,10 @@ module arguments
 * cursor - set to 1 will show cursor at start, 0 - will prevent from displaying the cursor. Default set to 1
 
 * blink  - 1 will blink current character position, 0 - blinking character will be disabled. Default set to 1
+
+* msg - message to show on display at start. Default "HD44780\nDriver".
+
+* showmsg - set to 1 will show message at start, 0 - will prevent message from being displayed.
 
 * major  - driver will register new device in /dev/i2clcd, you can force major number of the device by using this 
            configuration option or leave it for kernel to decide. 
