@@ -18,14 +18,19 @@ compilation
 -----------
 * Install DKMS toolset (sudo apt install dkms - for Ubuntu and all Debian-ish distros)
 * Checkout the repo somewhere within your directory tree: 
+
    *git clone https://github.com/lucidm/lcdi2c.git lcdi2c-1.0.1*
 * Copy the clone to /usr/src:
+
    *sudo cp -r lcdi2c-1.0.1 /usr/src/*
 * Add source of the module to the DKMS build system:
-   *sudo dkms add -m lcdi2c -v 1.0.1 *
+
+   *sudo dkms add -m lcdi2c -v 1.0.1*
 * Finally, install the module on default path:
+
    *sudo dkms install -m lcdi2c -v 1.0.1*
 * Connect the expander to power supply and i2c bus, go to examples and run 
+
    *python lcddev.py*
 
 module arguments
