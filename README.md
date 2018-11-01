@@ -10,41 +10,28 @@ requirements
 ------------
 * Running Linux Kernel and its source code. Version 3.x or higher is supported.
 * Prepared Kernel source for modules compilation.
-* Already loaded kernel modules for i2c bus (for example i2c_bcm2708 module loaded if 
-  destination host machine is Raspberry Pi) and i2c-dev if you want to test LCD before module
+* Already loaded kernel modules for i2c bus (for example i2c_bcm2708 is the default module 
+  for Raspberry Pi) and i2c-dev if you want to test LCD before module
   compilation.
 
 compilation
 -----------
-* Before making module, make sure you have properly installed Linux Kernel source in your
-  system. Symlinks in */lib/modules/$(uname -r)/source* and */lib/modules/$(uname -r)/build*
-  should point to proper kernel source directory tree.
-
-* If you didn't prepare compilation of Kernel previously, go to */lib/modules/$(uname -r)/build*
-  directory and run:
-  *make modules_prepare*. 
-
-* To make the module, go to the directory of the module and run commands:
-  *make -C /lib/modules/$(uname -r)/build M=$PWD*
-  *make -C /lib/modules/$(uname -r)/build M=$PWD modules_install*
-
-  Sometimes, especially if you made the kernel using cross compilation, you get an error statement like:
-  "the KERNEL_SOURCE/scripts/recordmcount: Syntax error: "(" unexpected".
-  To fix this, got to */lib/modules/$(uname -r)/build* on destination host (not the host you cross 
-  compiled kernel) and make:
-  make scripts
-  Then retry to make the module.
-
-* After successful compilation module will be installed in */lib/modules/$(uname -r)/extra* and
-  you be able to modprobe lcdi2c
-
-* Go to examples and run 
-  *python lcddev.py*
+* Install DKMS toolset (sudo apt install dkms - for Ubuntu and all Debian-ish distros)
+* Checkout the repo somewhere within your directory tree: 
+   *git clone https://github.com/lucidm/lcdi2c.git lcdi2c-1.0.1*
+* Copy the clone to /usr/src:
+   *sudo cp -r lcdi2c-1.0.1 /usr/src/*
+* Add source of the module to the DKMS build system:
+   *sudo dkms add -m lcdi2c -v 1.0.1 *
+* Finally, install the module on default path:
+   *sudo dkms install -m lcdi2c -v 1.0.1*
+* Connect the expander to power supply and i2c bus, go to examples and run 
+   *python lcddev.py*
 
 module arguments
 ----------------
-* Module expect arguments to be set before loading. If none of them is given, module will be loaded
-  with default values, which may, or may not be suitable for your particular LCD back board. If you want to
+* Module expects some arguments to be set before loading. If none of them is given, module will load
+  default values, which may, or may not be suitable for your particular LCD back board. If you want to
   read more about module parameters run command "modinfo lcdi2c" which will display short description
   about module it self and arguments you can set.
   
