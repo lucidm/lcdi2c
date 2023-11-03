@@ -270,15 +270,13 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
     return 0;
 }
 
-static int lcdi2c_remove(struct i2c_client *client)
+static void lcdi2c_remove(struct i2c_client *client)
 {
 	LcdData_t *data = i2c_get_clientdata(client);
 
         dev_info(&client->dev, "going to be removed");
         if (data)
             lcdfinalize(data);
-
-	return 0;
 }
 
 /*
@@ -293,12 +291,12 @@ MODULE_DEVICE_TABLE(i2c, lcdi2c_id);
 
 static struct i2c_driver lcdi2c_driver = {
 	.driver = {
-                .owner  = THIS_MODULE,
-		.name	= "lcdi2c",
-	},
-        .probe          = lcdi2c_probe,
-        .remove         = lcdi2c_remove,
-	.id_table	= lcdi2c_id,
+            .owner  = THIS_MODULE,
+            .name	= "lcdi2c",
+            },
+            .probe          = lcdi2c_probe,
+            .remove         = lcdi2c_remove,
+            .id_table	= lcdi2c_id,
 };
 
 
@@ -736,7 +734,7 @@ static int __init i2clcd857_init(void)
     adapter = i2c_get_adapter(busno);
     if (!adapter) return -EINVAL;
 
-     client = i2c_new_device(adapter, &board_info);
+     client = i2c_new_client_device(adapter, &board_info);
      if (!client) return -EINVAL;
 
     ret = i2c_add_driver(&lcdi2c_driver);
