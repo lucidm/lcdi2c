@@ -30,20 +30,23 @@
 
 extern uint pinout[8];
 
-typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
-                   LCD_TOPO_20x4 = 1,
-                   LCD_TOPO_20x2 = 2,
-                   LCD_TOPO_16x4 = 3,
-                   LCD_TOPO_16x2 = 4,
-                   LCD_TOPO_16x1T1 = 5,
-                   LCD_TOPO_16x1T2 = 6,
-		   LCD_TOPO_8x2 = 7,
-                   } lcd_topology;
+typedef enum lcd_topology {
+    LCD_TOPO_40x2 = 0,
+    LCD_TOPO_20x4 = 1,
+    LCD_TOPO_20x2 = 2,
+    LCD_TOPO_16x4 = 3,
+    LCD_TOPO_16x2 = 4,
+    LCD_TOPO_16x1T1 = 5,
+    LCD_TOPO_16x1T2 = 6,
+    LCD_TOPO_8x2 = 7,
+   } lcd_topology;
                    
 
 
 #define DEFAULT_CHIP_ADDRESS 0x27
 #define LCD_BUFFER_SIZE 0x68 //20 columns * 4 rows + 4 chars extra
+#define META_BUFFER_LEN 54
+#define SHORT_STR_LEN 12
 #define SUCCESS 0
 #define LCD_DEFAULT_COLS 16
 #define LCD_DEFAULT_ROWS 2
@@ -128,23 +131,23 @@ typedef enum lcd_topology {LCD_TOPO_40x2 = 0,
 #define IOCTLC (2)
 #define LCD_IOCTL_GETCHAR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x01 << 2), char *)
 #define LCD_IOCTL_SETCHAR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x01 << 2), char *)
-#define LCD_IOCTL_GETPOSITION _IOR(LCD_IOCTL_BASE, IOCTLB | (0x03 << 2), char *)
-#define LCD_IOCTL_SETPOSITION _IOW(LCD_IOCTL_BASE, IOCTLB | (0x04 << 2), char *)
-#define LCD_IOCTL_RESET _IOW(LCD_IOCTL_BASE, IOCTLC | (0x05 << 2), char *)
-#define LCD_IOCTL_HOME  _IOW(LCD_IOCTL_BASE, IOCTLC | (0x06 << 2), char *)
-#define LCD_IOCTL_SETBACKLIGHT _IOW(LCD_IOCTL_BASE, IOCTLC | (0x07 << 2), char *)
-#define LCD_IOCTL_GETBACKLIGHT _IOR(LCD_IOCTL_BASE, IOCTLC | (0x07 <<2), char *)
-#define LCD_IOCTL_SETCURSOR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x08 << 2), char *)
-#define LCD_IOCTL_GETCURSOR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x08 << 2), char *)
-#define LCD_IOCTL_SETBLINK _IOW(LCD_IOCTL_BASE, IOCTLC | (0x09 << 2), char *)
-#define LCD_IOCTL_GETBLINK _IOR(LCD_IOCTL_BASE, IOCTLC | (0x09 << 2), char *)
-#define LCD_IOCTL_SCROLLHZ _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0A << 2), char *)
-#define LCD_IOCTL_SETCUSTOMCHAR _IOW(LCD_IOCTL_BASE, IOCTLB | (0x0B << 2), char *)
-#define LCD_IOCTL_GETCUSTOMCHAR _IOR(LCD_IOCTL_BASE, IOCTLB | (0x0B << 2), char *)
-#define LCD_IOCTL_CLEAR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0C << 2), char *)
+#define LCD_IOCTL_GETPOSITION _IOR(LCD_IOCTL_BASE, IOCTLB | (0x02 << 2), char *)
+#define LCD_IOCTL_SETPOSITION _IOW(LCD_IOCTL_BASE, IOCTLB | (0x02 << 2), char *)
+#define LCD_IOCTL_RESET _IOW(LCD_IOCTL_BASE, IOCTLC | (0x03 << 2), char *)
+#define LCD_IOCTL_HOME  _IOW(LCD_IOCTL_BASE, IOCTLC | (0x04 << 2), char *)
+#define LCD_IOCTL_SETBACKLIGHT _IOW(LCD_IOCTL_BASE, IOCTLC | (0x05 << 2), char *)
+#define LCD_IOCTL_GETBACKLIGHT _IOR(LCD_IOCTL_BASE, IOCTLC | (0x05 <<2), char *)
+#define LCD_IOCTL_SETCURSOR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x06<< 2), char *)
+#define LCD_IOCTL_GETCURSOR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x06 << 2), char *)
+#define LCD_IOCTL_SETBLINK _IOW(LCD_IOCTL_BASE, IOCTLC | (0x07 << 2), char *)
+#define LCD_IOCTL_GETBLINK _IOR(LCD_IOCTL_BASE, IOCTLC | (0x07 << 2), char *)
+#define LCD_IOCTL_SCROLLHZ _IOW(LCD_IOCTL_BASE, IOCTLC | (0x08 << 2), char *)
+#define LCD_IOCTL_SETCUSTOMCHAR _IOW(LCD_IOCTL_BASE, IOCTLB | (0x09 << 2), char *)
+#define LCD_IOCTL_GETCUSTOMCHAR _IOR(LCD_IOCTL_BASE, IOCTLB | (0x09 << 2), char *)
+#define LCD_IOCTL_CLEAR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0A << 2), char *)
 typedef struct ioctl_description {
-  uint32_t ioctlcode;
-  char	name[24];
+  const uint32_t ioctl_code;
+  const char	name[24];
 } IOCTLDescription_t;
 
 #define ITOP(data, i, col, row) *(&col) = (u8) ((i) % data->organization.columns); *(&row) = (u8) ((i) / data->organization.columns)
@@ -163,7 +166,6 @@ typedef struct lcd_organization
 typedef struct lcddata 
 {
     struct i2c_client *handle;
-    struct device *device;
     struct semaphore sem;
     int major;
 
@@ -199,7 +201,6 @@ void lcdclear(LcdData_t *lcd);
 void lcdscrollvert(LcdData_t *lcd, u8 direction);
 void lcdscrollhoriz(LcdData_t *lcd, u8 direction);
 void lcdcustomchar(LcdData_t *lcd, u8 num, const u8 *bitmap);
-
 
 #define LOWLEVEL_WRITE(client, data) i2c_smbus_write_byte(client, data)
 #define USLEEP(usecs) _udelay_(usecs)

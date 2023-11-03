@@ -1,7 +1,29 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import time, random, sys, threading, signal
-from alphalcd.dlcdi2c import LcdI2C
+from os import lstat
+from alphalcd.dlcdi2c import (
+	LcdI2C, 
+  GET_POSITION, 
+  SET_POSITION,
+  GET_CUSTOMCHAR,
+  SET_CUSTOMCHAR,
+  GET_BACKLIGHT,
+  SET_BACKLIGHT,
+  GET_BLINK,
+  SET_BLINK,
+  GET_CHAR,
+  SET_CHAR,
+  GET_CURSOR,
+  SET_CURSOR,
+  RESET,
+  HOME,
+  CLEAR,
+  SCROLL_HZ
+  )
+
+I2C_BUSNO = 7
+I2C_DEVICE_ADDRESS = 0x27
 
 class lcdThread(threading.Thread):
   '''
@@ -10,7 +32,7 @@ class lcdThread(threading.Thread):
   threadLock = threading.RLock()
   quitEvent = threading.Event()
   def __init__(self, name, lcd, col, row):
-    super(lcdThread, self).__init__(name="{0}-{1}.{2}".format(name, col, row))
+    super(lcdThread, self).__init__(name=f"{name}-{col}.{row}")
     self.lcd = lcd 
     self.col = col
     self.row = row
@@ -23,11 +45,11 @@ class lcdThread(threading.Thread):
       will wait
     '''
     with lcdThread.threadLock:
-      self.buff = self.lcd.GETPOSITION
-      self.lcd.SETPOSITION = (self.col, self.row)
+      self.buff = self.lcd.ioread(GET_POSITION)
+      self.lcd.iowrite(SET_POSITION, (self.col, self.row))
       self.lcd.write(string)
       self.lcd.flush()
-      self.lcd.SETPOSITION = self.buff
+      self.lcd.iowrite(SET_POSITION, self.buff)
     
   
 class timeThread(lcdThread):
@@ -40,8 +62,8 @@ class timeThread(lcdThread):
   def run(self):
     while(1):
       self.write("{0}".format(time.strftime("%H:%M:%S")))
-      if lcdThread.quitEvent.isSet():
-	return
+      if lcdThread.quitEvent.is_set():
+        return
       time.sleep(1)
       
 class heartbeatThread(lcdThread):
@@ -50,23 +72,23 @@ class heartbeatThread(lcdThread):
   '''
   def __init__(self, lcd, col, row):
     super(heartbeatThread, self).__init__("HbThread", lcd, col, row)
-    self.heart = [ (0x06, 0x0,0x0,0x0,0x4,0x0,0x0,0x0,0x0),
-		   (0x06, 0x0,0x0,0x0,0x4,0x4,0x0,0x0,0x0),
-		   (0x06, 0x0,0x0,0x0,0xe,0xe,0x4,0x0,0x0),
-		   (0x06, 0x0,0x0,0xa,0x1f,0x1f,0xe,0x4,0x0),
+    self.heart = [ 
+      (0x06, 0x0,0x0,0x0,0x4,0x0,0x0,0x0,0x0),
+		  (0x06, 0x0,0x0,0x0,0x4,0x4,0x0,0x0,0x0),
+		  (0x06, 0x0,0x0,0x0,0xe,0xe,0x4,0x0,0x0),
+		  (0x06, 0x0,0x0,0xa,0x1f,0x1f,0xe,0x4,0x0),
       ]
-    
-    self.lcd.SETCUSTOMCHAR = self.heart[0]
+    self.lcd.iowrite(SET_CUSTOMCHAR, self.heart[0])
   
   def run(self):
     self.write("\x06")
     while(1):
       for i in [0,1,2,3,2,3,2,1,0]:
-	self.lcd.SETCUSTOMCHAR = self.heart[i]
-	time.sleep(0.1)
+        self.lcd.iowrite(SET_CUSTOMCHAR, self.heart[i])
+        time.sleep(0.1)
 
-      if lcdThread.quitEvent.isSet():
-	return
+      if lcdThread.quitEvent.is_set():
+        return
       time.sleep(2)
       
 class systemloadThread(lcdThread):
@@ -85,16 +107,15 @@ class systemloadThread(lcdThread):
     while(1):
       load = 7 - int(round(getCoreLoad(0.3, self.corecnt)[self.cpu] * 7))
       for i in range(7):
-	if i >= load:
-	  self.icon[i + 1] = 0x1f
-	else:
-	  self.icon[i + 1] = 0x00
-	  
-      self.lcd.SETCUSTOMCHAR = self.icon
-      self.oldload = load
-      time.sleep(0.6)
-      if lcdThread.quitEvent.isSet():
-	return
+        if i >= load:
+          self.icon[i + 1] = 0x1f
+        else:
+          self.icon[i + 1] = 0x00
+          self.lcd.iowrite(SET_CUSTOMCHAR, self.icon)
+          self.oldload = load
+          time.sleep(0.6)
+      if lcdThread.quitEvent.is_set():
+        return
       
 class systemLoad(object):
   '''
@@ -116,17 +137,17 @@ class systemLoad(object):
       self.threads.append(systemloadThread(i, self.lcd, len(self.string) + self.col + (i - 1), self.row, self.cpus))
       
   def start(self):
-    lcd.SETPOSITION = (self.col, self.row)
+    lcd.iowrite(SET_POSITION, (self.col, self.row))
     for i in range(self.cpus - 1):
       self.threads[i].start()
       
   def write(self, string):
     with lcdThread.threadLock:
-      self.buffer = self.lcd.GETPOSITION
-      self.lcd.SETPOSITION = (self.col, self.row)
+      self.buffer = self.lcd.ioread(GET_POSITION)
+      self.lcd.iowrite(SET_POSITION, (self.col, self.row))
       self.lcd.write(string)
       self.lcd.flush()
-      self.lcd.SETPOSITION = self.buffer
+      self.lcd.iowrite(SET_POSITION, self.buffer)
       
       
 class scrollThread(lcdThread):
@@ -140,18 +161,17 @@ class scrollThread(lcdThread):
   def run(self):
     if self.scrollby > 3:
       while(1):
-	for i in range(self.scrollby):
-	  self.lcd.SCROLLHZ = '1'
-	  time.sleep(0.3)
-	time.sleep(3)
-	for i in range(self.scrollby):
-	  self.lcd.SCROLLHZ = '0'
-	  time.sleep(0.3)
-	time.sleep(3)
-	if lcdThread.quitEvent.isSet():
-	  return
+        for i in range(self.scrollby):
+          self.lcd.iowrite(SCROLL_HZ, '1')
+          time.sleep(0.3)
+        time.sleep(3)
+        for i in range(self.scrollby):
+          self.lcd.iowrite(SCROLL_HZ, '0')
+          time.sleep(0.3)
+        time.sleep(3)
+        if lcdThread.quitEvent.is_set():
+          return
 
-    
     
 def threadsstop(signum, frame):
   print(" waiting for threads to finish...")
@@ -161,13 +181,13 @@ def threadsstop(signum, frame):
   
 def getCPUUsage():
   '''
-    Get all the lines starting from 'cpu' string and map values for each line
+    Get first three lines that starts from 'cpu' string and map values for each line
     as list of integers
   '''
-  statf = file("/proc/stat", "r")
+  statf = open("/proc/stat", "r")
   cpus = [' '.join(i.split()).split(" ")[1:] for i in statf.readlines() if i[0:3]=='cpu']
   statf.close()
-  return [map(int, filter(None, cpu)) for cpu in cpus]
+  return [map(int, filter(None, cpu)) for cpu in cpus[:3]]
 
 def getCoreDelta(interval, cores):
   '''
@@ -191,25 +211,25 @@ def getCoreLoad(interval, cores):
 
 if __name__ == "__main__":
  
-  lcd = LcdI2C(1, 0x27)
+  lcd = LcdI2C(I2C_BUSNO, I2C_DEVICE_ADDRESS)
   signal.signal(signal.SIGINT, threadsstop)
   with lcd as f:
-    lcd.SETBACKLIGHT = '0'
-    lcd.RESET = '1'
-    lcd.CLEAR = '1'
-    lcd.HOME = '1'
-    lcd.SETBACKLIGHT = '1'
-    lcd.SETCURSOR = '0'
-    lcd.SETBLINK = '0'
+    lcd.iowrite(SET_BACKLIGHT, '0')
+    lcd.iowrite(RESET,  '1')
+    lcd.iowrite(CLEAR, '1')
+    lcd.iowrite(HOME, '1')
+    lcd.iowrite(SET_BACKLIGHT, '1')
+    lcd.iowrite(SET_CURSOR, '0')
+    lcd.iowrite(SET_BLINK, '0')
     thread1 = timeThread(lcd, 0, 0)
-    thread2 = heartbeatThread(lcd, 7, 1)
-    load = systemLoad(lcd, 0, 1)
-    
-    #thread3 = scrollThread(lcd)
-    thread1.start()
+    thread2 = heartbeatThread(lcd, 12, 1)
+    thread3 = scrollThread(lcd)
+    thread4 = systemLoad(lcd, 0, 1)
+        
+    thread4.start()
+    thread3.start()
     thread2.start()
-    #thread3.start()
-    load.start()
+    thread1.start()
     while(1):
       time.sleep(5)
 
