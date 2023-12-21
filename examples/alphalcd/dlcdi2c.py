@@ -1,96 +1,101 @@
 import os, fcntl, array, struct
 import errno
 
+GET_CHAR = "GETCHAR"
+SET_CHAR = "SETCHAR"
+RESET = "RESET"
+HOME = "HOME"
+GET_BACKLIGHT = "GETBACKLIGHT"
+SET_BACKLIGHT = "SETBACKLIGHT"
+GET_CURSOR = "GETCURSOR"
+SET_CURSOR = "SETCURSOR"
+GET_BLINK = "GETBLINK"
+SET_BLINK = "SETBLINK"
+SCROLL_HZ = "SCROLLHZ"
+GET_CUSTOMCHAR = "GETCUSTOMCHAR"
+SET_CUSTOMCHAR = "SETCUSTOMCHAR"
+CLEAR = "CLEAR"
+SET_POSITION = "SETPOSITION"
+GET_POSITION = "GETPOSITION"
+
+
+META_FILE_PATH = "/sys/class/alphalcd/lcdi2c/meta"
+
 RDWR = 3
 WRITE = 1
 READ = 2
 
-class LcdI2C(object):
-  '''
-    Class for communication with the device. Will try to configure itself based on
-    /sys/class/alphalcd/lcdi2c/meta file. All ioctls will be accessible through
-    class attributes
-  '''
+class LcdI2C:
   def __init__(self, bus, address):
-    '''
-    '''
-    self.ioctls = {}
-    self.mode = 'rwb+'
     self.closed = True
-
+    self.mode = "r+"
+    self.ioctls = {}
+    self.rows = 0
+    self.columns = 0
+    self.bufferlength = 0
     try:
-      f = open("/sys/bus/i2c/devices/{0}-{1:04x}/name".format(bus, address))
-      self.name = "/dev/{0}".format(f.read().strip())
-      f.close()
-    except OSError as e:
-      raise OSError("Cannot figure out device path. Is lcdi2c module loaded?")
+      with open(f"/sys/bus/i2c/devices/{bus}-{address:04x}/name") as f:
+        self.device_path = f"/dev/{f.read().strip()}"
+
+      with open(META_FILE_PATH) as f:
+        meta = f.readlines()
+        meta = [m.rstrip() for m in meta]
+        self.columns = int(meta[2].split(":")[1])
+        self.rows = int(meta[1].split(":")[1])
+        self.bufferlength = self.columns * self.rows
+        ioctls_beg = meta.index("IOCTLS:") + 1
+        self.ioctls = dict(k.split("=") for k in [s.lstrip() for s in meta[ioctls_beg:]])
+    except Exception as e:
+        raise e
     
-    f = os.open("/sys/class/alphalcd/lcdi2c/meta", os.O_RDONLY)
-    if f:
-      meta = os.read(f, 512).rstrip().split("\n")
-      os.close(f)
-      self.columns, self.rows = [int(meta[v].split(":")[1]) for v in range(2,0,-1)]
-      self.bufferlength = self.columns * self.rows
-      try:
-	iioc = meta.index("IOCTLS:") + 1
-      except ValueError as e:
-	print("No IOCTLS section in meta file")
-	raise e      
-      self.ioctls = dict(k.split("=") for k in [s.lstrip() for s in meta[iioc:]])
-      
-    else:
-      print("Unable to open meta file for driver")
-      
-  def __cmdparse(self, cmd):
+  @staticmethod
+  def __cmdparse(cmd):
     return cmd & 0xff, (cmd >> 8) & 0xff, (cmd >> 16) & 0xff, (cmd >> 30) & 0x03
-       
-  def __setattr__(self, name, value):
-    if name == "ioctls" and name not in self.__dict__:
-      object.__setattr__(self, name, value)
-      return
+
     
-    if name in self.ioctls.keys():
-      cmd = int(self.ioctls[name], base=16)
-      nr, typem, size, direction = self.__cmdparse(cmd)
+  def iowrite(self, ioctl_name: str, value):
+      cmd = int(self.ioctls[ioctl_name], base=16)
+      nr, __, ___, direction = self.__cmdparse(cmd)
       
-      if (direction & WRITE) == 0:
-	raise AttributeError("IOCTL {0} can only be READ".format(name))
+      if not (direction & WRITE):
+        raise AttributeError("IOCTL {0} can only be READ".format(ioctl_name))
 
       s = array.array('B')
       if (nr & 2):
-	s.extend([ord(i) for i in value])
+        s.extend([ord(i) for i in value])
       else:
-	s.extend(value)
-      	
-      
-      result = fcntl.ioctl(self.file, cmd, s) if not self.closed else -1
-      return result;
+        s.extend(value)
+          
+      fcntl.ioctl(self.file, cmd, s) if not self.closed else -1
 
-    else:
-      object.__setattr__(self, name, value)
-  
-  def __getattr__(self, name):
-    if name not in self.__dict__:
-      if name not in self.ioctls.keys():
-	raise AttributeError
-      
-    if name in self.ioctls.keys():
-      cmd = int(self.ioctls[name], base=16)
-      nr, typem, size, direction = self.__cmdparse(cmd)
-      
-      if (direction & READ) == 0:
-	raise AttributeError("IOCTL {0} can only be WRITTEN".format(name))
-      
+  def ioread(self, ioctl_name):
+      cmd = int(self.ioctls[ioctl_name], base=16)
+      _, __, ___, direction = self.__cmdparse(cmd)
+        
+      if not (direction & READ):
+        raise AttributeError("IOCTL {0} can only be WRITTEN".format(ioctl_name))
+        
       buffer = struct.pack('9B', 0, 0, 0, 0, 0, 0, 0, 0, 0)
-      result = struct.unpack('9B', fcntl.ioctl(self.file, cmd, buffer)) if not self.closed else -1
-      return result;
+      return struct.unpack('9B', fcntl.ioctl(self.file, cmd, buffer)) if not self.closed else -1    
+        
+  def __enter__(self):
+    self.file =  open(file=self.device_path, mode=self.mode)
+    if self.file:
+      self.closed = False
+    return self.file
 
+  def __exit__(self, type, value, traceback):
+    if not self.closed:
+      if self.file:
+        self.file.close()
+    self.closed = True
+    return isinstance(value, TypeError)
   
   def open(self, device, mode):
     self.name = device
     self.mode = mode
-    self.file =  open(self.name, self.mode)
-    if file:
+    self.file =  open(file=self.name, mode=self.mode)
+    if self.file:
       self.closed = False
       
   def write(self, data):
@@ -98,19 +103,4 @@ class LcdI2C(object):
   
   def flush(self):
     return self.file.flush() if not self.closed else 0
-      
-  def __enter__(self):
-    self.file =  open(self.name, self.mode)
-    if file:
-      self.closed = False
-    return self.file
-
-  def __exit__(self, type, value, traceback):
-    if not self.closed:
-      if self.file:
-	self.file.close()
-	self.closed = True
-    return isinstance(value, TypeError)
-
-    
-
+  
