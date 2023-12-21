@@ -14,3 +14,5 @@ all:
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
+modules_install:
+	$(MAKE) -C /lib/modules/`uname -r`/build M=$(PWD) modules_install

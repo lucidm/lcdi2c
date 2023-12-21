@@ -678,7 +678,7 @@ DEVICE_ATTR(reset, S_IWUSR | S_IWGRP, NULL, lcdi2c_reset);
 DEVICE_ATTR(brightness, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_backlight_show, lcdi2c_backlight);
 DEVICE_ATTR(position, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_cursorpos_show, lcdi2c_cursorpos);
 DEVICE_ATTR(gData, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_data_show, lcdi2c_data);
-DEVICE_ATTR(meta, S_IRUSR | S_IRGRP, lcdi2c_meta_show, NULL);
+DEVICE_ATTR(meta, S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_meta_show, NULL);
 DEVICE_ATTR(cursor, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_cursor_show, lcdi2c_cursor);
 DEVICE_ATTR(blink, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_blink_show, lcdi2c_blink);
 DEVICE_ATTR(home, S_IWUSR | S_IWGRP, NULL, lcdi2c_home);
@@ -706,6 +706,11 @@ static const struct attribute *i2clcd_attrs[] = {
 static const struct attribute_group i2clcd_device_attr_group = {
         .attrs = (struct attribute **) i2clcd_attrs,
 };
+
+static int lcdi2c_dev_uevent(struct device *dev, struct kobj_uevent_env *env) {
+    add_uevent_var(env, "DEVMODE=%#o", 0666);
+    return 0;
+}
 
 static int __init i2clcd857_init(void) {
     int ret;
@@ -747,6 +752,8 @@ static int __init i2clcd857_init(void) {
         dev_warn(&gClient->dev, "class creation failed %s\n", DEVICE_CLASS_NAME);
         goto failed_class;
     }
+
+    lcdi2c_class->dev_uevent = lcdi2c_dev_uevent;
 
     lcdi2c_device = device_create(lcdi2c_class, NULL, MKDEV(major, minor), NULL,
                                   DEVICE_NAME);

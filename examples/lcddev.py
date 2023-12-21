@@ -22,7 +22,7 @@ from alphalcd.dlcdi2c import (
   SCROLL_HZ
   )
 
-I2C_BUSNO = 7
+I2C_BUSNO = 3
 I2C_DEVICE_ADDRESS = 0x27
 
 class lcdThread(threading.Thread):
