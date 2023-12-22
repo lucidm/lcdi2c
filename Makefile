@@ -1,18 +1,20 @@
-TOOLS := /usr/bin
-PREFIX := 
-KDIR := /lib/modules/$(shell uname -r)/build
+ifneq ($(KERNELRELEASE),)
+include Kbuild
+
+else
+KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
-obj-m :=  lcdi2c.o
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD modules
 
-all:
-	$(MAKE) -C $(KDIR) \
-		M=$(PWD) \
-		CROSS_COMPILE=$(TOOLS)/$(PREFIX) \
-		modules
+genbin:
+	echo "X" > $$PWD_bin.o_shipped
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	$(MAKE) -C $(KDIR) M=$$PWD clean
 
 modules_install:
-	$(MAKE) -C /lib/modules/`uname -r`/build M=$(PWD) modules_install
+	$(MAKE) -C /lib/modules/`uname -r`/build M=$$PWD modules_install
+
+endif
