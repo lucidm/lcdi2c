@@ -6,6 +6,8 @@ static uint address = DEFAULT_CHIP_ADDRESS; //Device address
 static uint topo = LCD_DEFAULT_ORGANIZATION;
 static uint cursor = 1;
 static uint blink = 1;
+static uint swscreen = 0;
+static char *wscreen = DEFAULT_WS;
 static IOCTLDescription_t ioControls[] = {
         {.ioctl_code = LCD_IOCTL_GETCHAR, .name = "GETCHAR",},
         {.ioctl_code = LCD_IOCTL_SETCHAR, .name = "SETCHAR",},
@@ -41,6 +43,8 @@ module_param(cursor, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(blink, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(topo, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(major, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+module_param(swscreen, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+module_param(wscreen, charp, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 
 MODULE_PARM_DESC(busno, " I2C Bus number, default 1");
 MODULE_PARM_DESC(address, " LCD I2C Address, default 0x27");
@@ -61,6 +65,8 @@ MODULE_PARM_DESC(topo, " Display organization, following values are currently su
                        "\t\t6 - 16x1 Type 2\n"
                        "\t\t7 - 8x2\n"
                        "\t\tDefault set to 16x2");
+MODULE_PARM_DESC(swscreen, " Show welcome screen on load, 1 - Yes, 0 - No, default 0");
+MODULE_PARM_DESC(wscreen, " Welcome screen string, default \""DEFAULT_WS"\"");
 
 static int lcdi2c_open(struct inode *inode, struct file *file) {
     if (down_interruptible(&gData->sem)) {
@@ -261,9 +267,16 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
     gData->blink = blink;
     gData->deviceopencnt = 0;
     gData->major = major;
+    gData->swscreen = swscreen;
+    if (strlen(wscreen))
+        strncpy(gData->welcome, wscreen, WS_MAX_LEN);
+    else
+        strncpy(gData->welcome, DEFAULT_WS, WS_MAX_LEN);
 
     lcdinit(gData, topo);
-    lcdprint(gData, "HD44780\nDriver");
+    if (gData->swscreen){
+        lcdprint(gData, gData->welcome);
+    }
 
     dev_info(&client->dev, "%ux%u LCD using bus 0x%X, at address 0x%X",
              gData->organization.columns,
@@ -459,12 +472,16 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
         }
 
         count = snprintf(buf, PAGE_SIZE,
+                         "Welcome Screen:\"%s\"\n"
+                         "Show Welcome Screen:%d\n"
                          "Topology:%s=%d\n"
                          "Rows:%d\n"
                          "Columns:%d\n"
                          "Rows addresses:%s\n"
                          "Pins:RS=%d RW=%d E=%d BCKLIGHT=%d D[4]=%d D[5]=%d D[6]=%d D[7]=%d\n"
                          "IOCTLS:\n",
+                         gData->welcome,
+                         gData->swscreen,
                          gData->organization.toponame,
                          gData->organization.topology,
                          gData->organization.rows,
@@ -707,7 +724,7 @@ static const struct attribute_group i2clcd_device_attr_group = {
         .attrs = (struct attribute **) i2clcd_attrs,
 };
 
-static int lcdi2c_dev_uevent(struct device *dev, struct kobj_uevent_env *env) {
+static int lcdi2c_dev_uevent(const struct device *dev, struct kobj_uevent_env *env) {
     add_uevent_var(env, "DEVMODE=%#o", 0666);
     return 0;
 }
@@ -1144,7 +1161,6 @@ void lcdcustomchar(LcdData_t *lcd, u8 num, const u8 *bitmap) {
 void lcdfinalize(LcdData_t *lcd) {
     lcdsetbacklight(lcd, 0);
     lcdclear(lcd);
-    lcdclear(lcd);
     lcdcommand(lcd, LCD_DC_DISPLAYOFF | LCD_DC_CURSOROFF | LCD_DC_CURSORBLINKOFF);
 }
 
@@ -1210,4 +1226,4 @@ module_exit(i2clcd857_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jarek Zok <jarekzok@gmail.com>");
 MODULE_DESCRIPTION("Driver for HD44780 LCD with PCF8574 I2C extension.");
-MODULE_VERSION("0.1.0");
+MODULE_VERSION("0.2.0");

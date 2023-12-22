@@ -42,14 +42,15 @@ typedef enum lcd_topology {
    } lcd_topology;
                    
 
-
-#define DEFAULT_CHIP_ADDRESS 0x27
-#define LCD_BUFFER_SIZE 0x68 //20 columns * 4 rows + 4 chars extra
-#define META_BUFFER_LEN 54
-#define SHORT_STR_LEN 12
-#define SUCCESS 0
-#define LCD_DEFAULT_COLS 16
-#define LCD_DEFAULT_ROWS 2
+#define WS_MAX_LEN (16)
+#define DEFAULT_WS "HDD44780\nDriver"
+#define DEFAULT_CHIP_ADDRESS (0x27)
+#define LCD_BUFFER_SIZE (0x68) //20 columns * 4 rows + 4 chars extra
+#define META_BUFFER_LEN (74)
+#define SHORT_STR_LEN (12)
+#define SUCCESS (0)
+#define LCD_DEFAULT_COLS (16)
+#define LCD_DEFAULT_ROWS (2)
 #define LCD_DEFAULT_ORGANIZATION LCD_TOPO_16x2
 
 #define PINTR(pin) (pinout[pin])
@@ -64,17 +65,17 @@ typedef enum lcd_topology {
 #define PIN_DB6             PINTR(6)
 #define PIN_DB7             PINTR(7)
 
-#define LCD_CMD_CLEARDISPLAY    0
-#define LCD_CMD_HOME            1
-#define LCD_CMD_ENTRYMODE       2
-#define LCD_CMD_DISPLAYCONTROL  3
-#define LCD_CMD_DISPLAYSHIFT    4
-#define LCD_CMD_FUNCTIONSET     5
-#define LCD_CMD_SETCGRAMADDR    6
-#define LCD_CMD_SETDDRAMADDR    7
+#define LCD_CMD_CLEARDISPLAY    (0)
+#define LCD_CMD_HOME            (1)
+#define LCD_CMD_ENTRYMODE       (2)
+#define LCD_CMD_DISPLAYCONTROL  (3)
+#define LCD_CMD_DISPLAYSHIFT    (4)
+#define LCD_CMD_FUNCTIONSET     (5)
+#define LCD_CMD_SETCGRAMADDR    (6)
+#define LCD_CMD_SETDDRAMADDR    (7)
 
 //for convenience
-#define LCD_MODE_COMMAND        0
+#define LCD_MODE_COMMAND        (0)
 #define LCD_MODE_DATA           (1 << PIN_RS)
 #define LCD_CLEAR               (1 << LCD_CMD_CLEARDISPLAY)
 #define LCD_HOME                (1 << LCD_CMD_HOME)
@@ -114,17 +115,17 @@ typedef enum lcd_topology {
 
 
 
-#define LCD_REG_DATA        1
-#define LCD_REG_COMMAND     0
+#define LCD_REG_DATA        (1)
+#define LCD_REG_COMMAND     (0)
 
-#define LCD_READ            1
-#define LCD_WRITE           0
+#define LCD_READ            (1)
+#define LCD_WRITE           (0)
 
 #define DEVICE_NAME "lcdi2c"
-#define DEVICE_MAJOR 0
+#define DEVICE_MAJOR (0)
 #define DEVICE_CLASS_NAME "alphalcd"
 
-#define LCD_IOCTL_BASE 0xF5
+#define LCD_IOCTL_BASE (0xF5)
 //Binary argument
 #define IOCTLB (1)
 //Character argument 
@@ -178,10 +179,12 @@ typedef struct lcddata
     u8 displaycontrol;
     u8 displayfunction;
     u8 displaymode;
+    u8 swscreen;
     u8 buffer[LCD_BUFFER_SIZE];
     u8 customchars[8][8];
     u16 deviceopencnt;
     u8 devicefileptr;
+    char welcome[16];
 } LcdData_t;
 
 void _udelay_(u32 usecs);
