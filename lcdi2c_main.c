@@ -314,7 +314,7 @@ static struct i2c_driver lcdi2c_driver = {
 
 
 #ifdef HAVE_PROC_OPS
-static const struct proc_ops lcdi2c_fops = {
+static struct proc_ops lcdi2c_fops = {
         .proc_open = lcdi2c_open,
         .proc_read = lcdi2c_fopread,
         .proc_write = lcdi2c_fopwrite,
