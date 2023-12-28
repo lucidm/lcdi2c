@@ -1,44 +1,41 @@
 Linux kernel module for alphanumeric LCDs on HD44780 and I2C expander attached. 
-Module supports LCDs with PCF8574 based expanders attached.
+Module supports LCDs with PCF8574 based expander attached.
 
-The module requires kernel version 3.x or higher, access to I2C bus on destination machine 
-(module was tested on RaspberryPI 2 with kernel 4.1 and i2c_bcm2708 already loaded). 
-It is currently able to drive only one LCD at once, however you have a choice which LCD
-you would like to drive by this module, using proper module option.
+If you're using raspberry pi, install: ```sudo apt install linux-headers-rpi``` package prior to compilation.
 
 requirements
 ------------
 * Running Linux Kernel and its source code. Version 3.x or higher is supported.
 * Prepared Kernel source for modules compilation.
-* Already loaded kernel modules for i2c bus (for example i2c_bcm2708 is the default module 
-  for Raspberry Pi) and i2c-dev if you want to test LCD before module
-  compilation.
 
 compilation
 -----------
-* Install DKMS toolset (sudo apt install dkms - for Ubuntu and all Debian-ish distros)
-* Checkout the repo somewhere within your directory tree: 
 
-   *git clone https://github.com/lucidm/lcdi2c.git lcdi2c-1.0.1*
-* Copy the clone to /usr/src:
+* Clone the repository to your local machine:
+   * ```git clone https://github.com/lucidm/lcdi2c.git```
 
-   *sudo cp -r lcdi2c-1.0.1 /usr/src/*
-* Add source of the module to the DKMS build system:
+* Enter the directory:
+    * ```cd lcdi2c```
 
-   *sudo dkms add -m lcdi2c -v 1.0.1*
-* Finally, install the module on default path:
+* Compile the module:
+    * ```make CONFIG_LCDI2C=m```
 
-   *sudo dkms install -m lcdi2c -v 1.0.1*
-* Connect the expander to power supply and i2c bus, go to examples and run 
+* Install the module:
+    * ```sudo make modules_install```
 
-   *python lcddev.py*
+* Finally load the module:
+    * ```sudo insmod /lib/modules/$(uname -r)/extra/lcdi2c.ko topo=2 busno=1 swscreen=1```
+     
+    where topo is LCD topology, busno is I2C bus number and swscreen is switch for welcome screen (1 - on/ 0 - off)
+ 
+* Run the example:
+     * ```./examples/lcddev.py```
 
 module arguments
 ----------------
 * Module expects some arguments to be set before loading. If none of them is given, module will load
-  default values, which may, or may not be suitable for your particular LCD back board. If you want to
-  read more about module parameters run command "modinfo lcdi2c" which will display short description
-  about module it self and arguments you can set.
+  with default ones, which may, or may not be suitable for your particular configuration. Running 
+  ```modinfo lcdi2c.ko``` will give you information about module expected arguments. Here's the list:
   
 * busno  - bus number, same as in proof application.
 
@@ -67,27 +64,26 @@ module arguments
 
 /sys device interface
 ----------------
-* Module has two sets of interfaces you can interact with your LCD. It registers /dev/lcdi2c character device, which you
-  can open and manipulate using standard open/close/read/write/ioctl quintet, or through /sys interface. However you
-  are able to use /dev/lcdi2c device, /sys interface is preffered. 
-  Let's work out /sys interface first. Once module is loaded, driver will register new class devices called
-  "/sys/class/alphalcd" in which subdirectory "lcdi2c" will be created.
+* Module has two sets of interfaces you can interact with your LCD. 
+  * Through ```/dev/lcdi2c``` character device, which you can open and manipulate using standard open/close/read/write/ioctl quintet, or through /sys interface. 
+  * Or you can use /sys interface which is preferred. 
+  Let's work out /sys interface first. Once the module is loaded, driver will register new class device 
+  ```/sys/class/alphalcd``` containing "lcdi2c" directory.
   
-* "/sys/class/alphalcd/lcdi2c" is the directory containing all interace files required to interact with LCD, here is
-  alphabetically ordered list of files with short descritpiion:
+* ```/sys/class/alphalcd/lcdi2c``` All files in this directory are interfacing with lcdi2c module.
   
-  - brighness - write "0" to this file to switch backlight off, any value different from 0 up to 255 will switch 
-                backlight on.
+  - **brightness** - write "0" to this file to switch backlight off, "1" to switch it on. Reading this file will tell you about
+                current status of backlight.
                 
-  - blink     - write "0" to switch blinking character off, "1" to switch it on. Reading this file will tell you 
-                about current status of blinking.
+  - **blink**     - write "0" to switch blinking character off, "1" to switch it on. Reading this file will tell you 
+                about current status of cursor's blinking.
                 
-  - clear     - write only, writing "1" to this file will clear LCD.
+  - **clear**     - write only, writing "1" to this file will clear LCD.
   
-  - cursor    - write "0" for switch display cursor off, "1" for switch cursor on. Reading this file will tell you about
+  - **cursor**    - write "0" for switch cursor off, "1" for switch cursor on. Reading this file will tell you about
                 current status of the cursor.
                 
-  - customchar- HD44780 and its clones usually provide way to define 8 custom characters, this file will let you to
+  - **customchar**- HD44780 and its clones usually provide way to define 8 custom characters, this file will let you to
                 define those characters. This file is binary, each character consists of 9 bytes, first byte informs
                 about character number (characters have numbers from 0 to 7), next eight bytes is bitmap definition of
                 the character itself. Next 9 bytes repeats this pattern for another character. Total length of this file is
@@ -96,30 +92,31 @@ module arguments
                 to change, next 8 bytes defines bitmap of the character. You are allowed to define more than one character per
                 write, but keep in mind, you're always writing 9 * n bytes, where n is number of characters you'd like to define.
                 
-  - data      - driver uses internal buffer which is 1:1 internal LCD RAM mirror, everything you write to LCD through
-                driver interface will be represented in this file. You can also write to this file, and all that you wrote
-                would be visible on the display. Keep in mind, size of RAM of LCD is limited only to 104 bytes.
-                Internal RAM organization depends on "topo" parameter, however reading this file will represent what is actually
-                on the screen, and writing to it will have 1:1 representation on the LCD, configuration of this buffer depends on
-                current LCD display topology (for some displays, not all bytes in RAM are used to display data and it's true for
-                this buffer file too).
-                If you want to know more about this kind of displays RAM organization, please read link below
-                http://web.alfredstate.edu/weimandn/lcd/lcd_addressing/lcd_addressing_index.html
-                which will greatly explain how RAM organization differs in different LCD types.
+    - **data**      - driver uses internal buffer which is 1:1 internal LCD RAM mirror, everything you write to LCD through
+                  driver interface will be represented in this file. You can also write to this file, and all that you wrote
+                  would be visible on the display. Keep in mind, size of RAM of LCD is limited only to 104 bytes.
+                  Internal RAM organization depends on "topo" parameter, however reading this file will represent what is actually
+                  on the screen, and writing to it will have 1:1 representation on the LCD, configuration of this buffer depends on
+                  current LCD display topology (for some displays, not all bytes in RAM are used to display data and it's true for
+                  this buffer file too).
+                  If you want to know more about this kind of displays RAM organization, please read link below
+                  https://web.alfredstate.edu/faculty/weimandn/lcd/lcd_addressing/lcd_addressing_index.html
+                  which will greatly explain how RAM organization differs in different LCD types.
                 
-  - dev       - description of major:minor device number associated with /dev/lcdi2c device file.
+  - **dev**       - description of major:minor device number associated with /dev/lcdi2c device file.
   
-  - home      - writing "1" will cause LCD to move cursor to first column and row of LCD.
+  - **home**      - writing "1" will cause LCD to move cursor to first column and row of LCD.
   
-  - meta      - description of currently used LCD. You can only read this file to get current LCD configurartion.
+  - **meta**      - description of currently used LCD. Read-only file in YAML format. This file contains information about
+                currently used LCD, its topology, size, driver version, used bus, device address, etc. Please take a look at the python example which use this interface to get information about the display.
   
-  - position  - this file will help you to set or read current cursor position. This file contains two bytes,
+  - **position**  - this file will help you to set or read current cursor position. This file contains two bytes,
 	        value of first byte informs about current cursor position at column, second byte contain information
 	        about current cursor position at row. Writing two bytes to this file, will set cursor at position. 
 	        
-  - reset     - write only file, "1" write to this file will reset LCD to state after module was loaded.
+  - **reset**     - write only file, "1" write to this file will reset LCD to state after module was loaded.
   
-  - scrollhz  - scroll horizontally, write "1" to this file to scroll content of LCD horizontally by 1 character to the right,
+  - **scrollhz**  - scroll horizontally, write "1" to this file to scroll content of LCD horizontally by 1 character to the right,
                 scrolling to the left is made by writing "0" to this file. This scrolling technique will not change contents of internal RAM of
                 your display, so "data" file will also keep its content intact. Opposite character which leave display during 
                 the scroll will appear on the on the other outermost position, so this scroll always keeps information on the screen.
