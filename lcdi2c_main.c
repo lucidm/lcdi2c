@@ -312,17 +312,6 @@ static struct i2c_driver lcdi2c_driver = {
         .id_table    = lcdi2c_id,
 };
 
-
-#ifdef HAVE_PROC_OPS
-static struct proc_ops lcdi2c_fops = {
-        .proc_open = lcdi2c_open,
-        .proc_read = lcdi2c_fopread,
-        .proc_write = lcdi2c_fopwrite,
-        .proc_lseek = lcdi2c_lseek,
-        .proc_release = lcdi2c_release,
-        .proc_ioctl = lcdi2c_ioctl,
-};
-#else
 static struct file_operations lcdi2c_fops = {
         .read = lcdi2c_fopread,
         .write = lcdi2c_fopwrite,
@@ -332,7 +321,6 @@ static struct file_operations lcdi2c_fops = {
         .release = lcdi2c_release,
         .owner = THIS_MODULE,
 };
-#endif
 
 static ssize_t lcdi2c_reset(struct device *dev, struct device_attribute *attr,
                             const char *buf, size_t count) {
