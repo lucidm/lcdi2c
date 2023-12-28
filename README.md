@@ -21,11 +21,12 @@ compilation
     * ```make CONFIG_LCDI2C=m```
 
 * Install the module:
-    * ```sudo make modules_install```
+    * ```sudo make install```
 
-* Finally load the module:
+* Finally, load the module:
     * ```sudo insmod /lib/modules/$(uname -r)/extra/lcdi2c.ko topo=2 busno=1 swscreen=1```
-     
+    * or using modprobe:
+      ```sudo modprobe lcdi2c topo=2 busno=1 swscreen=1```
     where **topo** is LCD topology, **busno** is I2C bus number and **swscreen** is switch for welcome screen (1 - on/ 0 - off)
  
 * Run the example:

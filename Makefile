@@ -16,7 +16,8 @@ genbin:
 clean:
 	$(MAKE) -C $(KDIR) M=$$PWD clean
 
-modules_install:
+install:
 	$(MAKE) -C /lib/modules/`uname -r`/build M=$$PWD modules_install
+	depmod -a
 
 endif
