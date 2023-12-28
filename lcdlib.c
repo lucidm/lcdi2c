@@ -164,11 +164,11 @@ void lcdsetbacklight(LcdHandler_t *lcd, u8 backlight) {
  */
 void lcdcursor(LcdHandler_t *lcd, u8 cursor) {
     if (cursor)
-        lcd->displaycontrol |= LCD_CURSOR;
+        lcd->display_control |= LCD_CURSOR;
     else
-        lcd->displaycontrol &= ~LCD_CURSOR;
+        lcd->display_control &= ~LCD_CURSOR;
 
-    lcdcommand(lcd, lcd->displaycontrol);
+    lcdcommand(lcd, lcd->display_control);
 }
 
 /**
@@ -181,11 +181,11 @@ void lcdcursor(LcdHandler_t *lcd, u8 cursor) {
  */
 void lcdblink(LcdHandler_t *lcd, u8 blink) {
     if (blink)
-        lcd->displaycontrol |= LCD_BLINK;
+        lcd->display_control |= LCD_BLINK;
     else
-        lcd->displaycontrol &= ~LCD_BLINK;
+        lcd->display_control &= ~LCD_BLINK;
 
-    lcdcommand(lcd, lcd->displaycontrol);
+    lcdcommand(lcd, lcd->display_control);
 }
 
 /**
@@ -303,7 +303,7 @@ void lcdcustomchar(LcdHandler_t *lcd, u8 num, const u8 *bitmap) {
     lcdcommand(lcd, LCD_CGRAM_SET | (num << 3));
 
     for (i = 0; i < 8; i++) {
-        lcd->customchars[num][i] = bitmap[i];
+        lcd->custom_chars[num][i] = bitmap[i];
         lcdsend(lcd, bitmap[i], (1 << PIN_RS));
     }
 }
@@ -329,7 +329,7 @@ void lcdfinalize(LcdHandler_t *lcd) {
  * @return none
  *
  */
-void lcdinit(LcdHandler_t *lcd, lcd_topology topo) {
+void lcdinit(LcdHandler_t *lcd, lcd_topology_t topo) {
     memset(lcd->buffer, 0x20, LCD_BUFFER_SIZE); //Fill buffer with spaces
 
     if (topo > LCD_TOPO_8x2)
@@ -341,12 +341,12 @@ void lcdinit(LcdHandler_t *lcd, lcd_topology topo) {
     memcpy(lcd->organization.addresses, topoaddr[topo], sizeof(topoaddr[topo]) - 2);
     lcd->organization.toponame = toponames[topo];
 
-    lcd->displaycontrol = 0;
-    lcd->displaymode = 0;
+    lcd->display_control = 0;
+    lcd->display_mode = 0;
 
-    lcd->displayfunction = LCD_FS_4BITDATA | LCD_FS_1LINE | LCD_FS_5x8FONT;
+    lcd->display_function = LCD_FS_4BITDATA | LCD_FS_1LINE | LCD_FS_5x8FONT;
     if (lcd->organization.rows > 1)
-        lcd->displayfunction |= LCD_FS_2LINES;
+        lcd->display_function |= LCD_FS_2LINES;
 
     MSLEEP(50);
     _buswrite(lcd, lcd->backlight ? (1 << PIN_BACKLIGHTON) : 0);
@@ -363,10 +363,10 @@ void lcdinit(LcdHandler_t *lcd, lcd_topology topo) {
 
     _write4bits(lcd, (1 << PIN_DB5));
 
-    lcdcommand(lcd, lcd->displayfunction);
+    lcdcommand(lcd, lcd->display_function);
 
-    lcd->displaycontrol |= (LCD_DC_DISPLAYON | LCD_DC_CURSOROFF | LCD_DC_CURSORBLINKOFF);
-    lcdcommand(lcd, lcd->displaycontrol);
+    lcd->display_control |= (LCD_DC_DISPLAYON | LCD_DC_CURSOROFF | LCD_DC_CURSORBLINKOFF);
+    lcdcommand(lcd, lcd->display_control);
 
     lcdclear(lcd);
     lcdhome(lcd);

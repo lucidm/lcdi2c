@@ -2,6 +2,8 @@ import array
 import fcntl
 import struct
 
+import yaml
+
 GET_CHAR = "GETCHAR"
 SET_CHAR = "SETCHAR"
 RESET = "RESET"
@@ -26,8 +28,12 @@ WRITE = 1
 READ = 2
 
 
+class LcdI2CInitError(Exception):
+    pass
+
+
 class LcdI2C:
-    def __init__(self, bus, address):
+    def __init__(self, bus=None, address=None):
         self.file = None
         self.name = None
         self.closed = True
@@ -36,27 +42,34 @@ class LcdI2C:
         self.rows = 0
         self.columns = 0
         self.bufferlength = 0
-        try:
-            with open(f"/sys/bus/i2c/devices/{bus}-{address:04x}/name") as f:
-                self.device_path = f"/dev/{f.read().strip()}"
+        self.bus = bus
+        self.address = address
 
-            with open(META_FILE_PATH) as f:
-                meta = f.readlines()
-                meta = [m.rstrip() for m in meta]
-                self.columns = int(meta[2].split(":")[1])
-                self.rows = int(meta[1].split(":")[1])
+        try:
+            with open(META_FILE_PATH) as meta:
+                p = yaml.safe_load(meta)
+                self.columns = p["metadata"]["columns"]
+                self.rows = p["metadata"]["rows"]
                 self.bufferlength = self.columns * self.rows
-                ioctls_beg = meta.index("IOCTLS:") + 1
-                self.ioctls = dict(k.split("=") for k in [s.lstrip() for s in meta[ioctls_beg:]])
-        except Exception as e:
-            raise e
+                self.ioctls = p["metadata"]["ioctls"]
+                if not (bus or address):
+                    self.bus = p["metadata"]["busno"]
+                    self.address = p["metadata"]["reg"]
+        except FileNotFoundError:
+            raise LcdI2CInitError(f"Metadata file not found at {META_FILE_PATH}")
+
+        try:
+            with open(f"/sys/bus/i2c/devices/{self.bus}-{self.address:04x}/name") as f:
+                self.device_path = f"/dev/{f.read().strip()}"
+        except FileNotFoundError:
+            raise LcdI2CInitError(f"Device not found at bus {self.bus} address {self.address}")
 
     @staticmethod
     def __cmdparse(cmd):
         return cmd & 0xff, (cmd >> 8) & 0xff, (cmd >> 16) & 0xff, (cmd >> 30) & 0x03
 
     def io_write(self, ioctl_name: str, value):
-        cmd = int(self.ioctls[ioctl_name], base=16)
+        cmd = int(self.ioctls[ioctl_name])
         nr, __, ___, direction = self.__cmdparse(cmd)
 
         if not (direction & WRITE):
@@ -71,7 +84,7 @@ class LcdI2C:
         fcntl.ioctl(self.file, cmd, s) if not self.closed else -1
 
     def io_read(self, ioctl_name):
-        cmd = int(self.ioctls[ioctl_name], base=16)
+        cmd = int(self.ioctls[ioctl_name])
         _, __, ___, direction = self.__cmdparse(cmd)
 
         if not (direction & READ):

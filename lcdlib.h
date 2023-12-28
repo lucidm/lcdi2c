@@ -98,7 +98,7 @@ extern uint pinout[8];
 //Position as row and column to memory address
 #define PTOMEMADDR(data, col, row) ((col % data->organization.columns) + data->organization.addresses[(row % data->organization.rows)])
 
-typedef enum lcd_topology {
+typedef enum {
     LCD_TOPO_40x2 = 0,
     LCD_TOPO_20x4 = 1,
     LCD_TOPO_20x2 = 2,
@@ -107,16 +107,16 @@ typedef enum lcd_topology {
     LCD_TOPO_16x1T1 = 5,
     LCD_TOPO_16x1T2 = 6,
     LCD_TOPO_8x2 = 7,
-} lcd_topology;
+} lcd_topology_t;
 
 /*
   LCD topology description, first four bytes defines subsequent row of text addresses and how
   are they mapped in internal RAM of LCD, last two bytes describes number of columns and number
   of rows.
-  LCD_TOPO_16x1T1 is same as 8x2. RAM is divided in two areas by 8 bytes, left bytes
+  LCD_TOPO_16x1T1 is same as 8x2. RAM is divided in two areas 8 bytes each, left bytes
   are starting from address 0x00, right hand half of LCD is starting from 0x40, that's
   exactly how 8x2 LCD is organized. So this type of LCD can be considered as 8x2 LCD with two
-  rows laying in the same line on both halfs of an LCD, instead both lines stacked on the top
+  rows laying in the same line on both halfs of an LCD, instead of both lines being stacked on the top
   of each other.
   Type 2 of 16x1 has straighforward organization, first sixteen bytes representing a row on an LCD.
 */
@@ -130,8 +130,8 @@ static const u8 topoaddr[][6] = {{0x00, 0x40, 0x00, 0x00, 40, 2}, //LCD_TOPO_40x
                                  {0x00, 0x40, 0x00, 0x40, 8,  2}, //LCD_TOPO_8x2
 };
 
-/* Text representation of various LCD topologies */
-static const char *toponames[] = {
+/* Text representation of LCD topologies */
+__attribute__ ((unused)) static const char *toponames[] = {
         "40x2",
         "20x4",
         "20x2",
@@ -147,7 +147,7 @@ typedef struct lcd_organization
     u8 columns;
     u8 rows;
     u8 addresses[4];
-    lcd_topology topology;
+    lcd_topology_t topology;
     const char *toponame;
 } LcdOrganization_t;
 
@@ -163,14 +163,14 @@ typedef struct lcddata
     u8 blink;
     u8 column;
     u8 row;
-    u8 displaycontrol;
-    u8 displayfunction;
-    u8 displaymode;
-    u8 swscreen;
+    u8 display_control;
+    u8 display_function;
+    u8 display_mode;
+    u8 show_welcome_screen;
     u8 buffer[LCD_BUFFER_SIZE];
-    u8 customchars[8][8];
-    u16 deviceopencnt;
-    u8 devicefileptr;
+    u8 custom_chars[8][8];
+    u16 open_cnt;
+    u8 use_cnt;
     char welcome[16];
 } LcdHandler_t;
 
@@ -184,16 +184,11 @@ void lcdcursor(LcdHandler_t *lcd, u8 cursor);
 void lcdblink(LcdHandler_t *lcd, u8 blink);
 u8 lcdprint(LcdHandler_t *lcd, const char *data);
 void lcdfinalize(LcdHandler_t *lcd);
-void lcdinit(LcdHandler_t *lcd, lcd_topology topo);
+void lcdinit(LcdHandler_t *lcd, lcd_topology_t topo);
 void lcdhome(LcdHandler_t *lcd);
 void lcdclear(LcdHandler_t *lcd);
 void lcdscrollvert(LcdHandler_t *lcd, u8 direction);
 void lcdscrollhoriz(LcdHandler_t *lcd, u8 direction);
 void lcdcustomchar(LcdHandler_t *lcd, u8 num, const u8 *bitmap);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Jarek Zok <jarekzok@gmail.com>");
-MODULE_DESCRIPTION(LCDI2C8574_DESCRIPTION);
-MODULE_VERSION(LCDI2C8574_VERSION);
 
 #endif //LCDI2C_LCDLIB_H
