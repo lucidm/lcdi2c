@@ -370,7 +370,7 @@ class LCDPrint:
         """
         self.lcd(LCDCommand.HOME.value)
 
-    def print(self, string, col: int = None, row: int = None) -> Tuple[int, int]:
+    def print(self, string: str, col: int = None, row: int = None) -> Tuple[int, int]:
         """
         Print string at specified position or at the current position.
         :param string:
