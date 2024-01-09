@@ -11,3 +11,4 @@
 *.order
 *.d
 __pycache__/
+dist/
