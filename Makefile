@@ -10,7 +10,7 @@ default:
 
 all: default
 
-genbin:
+genbin: default install
 	echo "X" > $$PWD_bin.o_shipped
 
 clean:
@@ -19,5 +19,8 @@ clean:
 install:
 	$(MAKE) -C /lib/modules/`uname -r`/build M=$$PWD modules_install
 	depmod -a
+
+dtbo: lcdi2c.dts
+	dtc -@ -I dts -O dtb -o lcdi2c.dtbo lcdi2c.dts
 
 endif

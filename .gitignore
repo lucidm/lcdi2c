@@ -10,3 +10,4 @@
 *.symvers
 *.order
 *.d
+__pycache__/

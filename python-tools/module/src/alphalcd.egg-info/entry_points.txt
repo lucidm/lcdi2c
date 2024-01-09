@@ -1,0 +1,2 @@
+[console_scripts]
+lcddisp = lcdi2c.lcddisp:main

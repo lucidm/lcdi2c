@@ -1,0 +1,32 @@
+Metadata-Version: 2.1
+Name: alphalcd
+Version: 0.2.4
+Summary: Python frontend for LCDI2C device driver
+Author-email: Jarek Żok <jarekzok@gmail.com>
+Project-URL: Homepage, https://github.com/lucidm/lcdi2c
+Project-URL: Repository, https://github.com/lucidm/lcdi2c
+Project-URL: Issues, https://github.com/lucidm/lcdi2c/issues
+Keywords: lcd,i2c,driver,display,hd44780,pcf8574
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: System :: Hardware :: Hardware Drivers
+Classifier: Topic :: Communications :: Email
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+Contains LCDI2C binding source code for the Python module.
+
+## Installation
+
+```bash
+```
+
+## Usage
+
+```python
+```
+

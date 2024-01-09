@@ -26,14 +26,14 @@ I2C_DEVICE_ADDRESS = 0x27
 
 def get_cpu_usage():
     """
-    Get first three lines that starts from 'cpu' string and map values for each line
+    Get first three lines begin with 'cpu' string and map values for each line
     as list of integers
     """
 
-    statf = open("/proc/stat", "r")
-    cpus = [' '.join(i.split()).split(" ")[1:] for i in statf.readlines() if i[0:3] == 'cpu']
-    statf.close()
-    return [map(int, filter(None, cpu)) for cpu in cpus[:3]]
+    with open("/proc/stat", "r") as statf:
+        cpus = [' '.join(i.split()).split(" ")[1:] for i in statf.readlines() if i[0:3] == 'cpu']
+
+    return [map(int, filter(None, cpu)) for cpu in cpus[1:6]]
 
 
 def get_core_delta(interval, cores):
@@ -50,7 +50,7 @@ def get_core_delta(interval, cores):
 
 def get_core_load(interval, cores):
     """
-    Final function to calculate actual load of a core in terms between 0 and 1
+    Final function to calculate actual load of a core in range between 0 and 1
     """
 
     deltas = get_core_delta(interval, cores)
@@ -65,7 +65,7 @@ class LcdThread(threading.Thread):
     """
     threadLock = threading.RLock()
     quitEvent = threading.Event()
-    barrier = threading.Barrier(3 + len(get_cpu_usage()))
+    barrier = threading.Barrier(2 + len(get_cpu_usage()))
 
     def __init__(self, name: str, lcd: LcdI2C, col: int, row: int):
         super(LcdThread, self).__init__(name=f"{name}-{col}.{row}")
@@ -167,21 +167,21 @@ class SystemLoad:
     """
 
     def __init__(self, lcd, col, row):
-        self.cpus = len(get_cpu_usage())
+        self.cores = len(get_cpu_usage())
         self.buffer = range(9)
         self.col = col
         self.row = row
         self.lcd = lcd
         self.threads = []
-        self.string = ":"
+        self.string = "CPU:"
         self.write(self.string)
-        for i in range(1, self.cpus):
+        for i in range(1, self.cores):
             self.threads.append(
-                SystemLoadThread(i, self.lcd, len(self.string) + self.col + (i - 1), self.row, self.cpus))
+                SystemLoadThread(i, self.lcd, len(self.string) + self.col + (i - 1), self.row, self.cores))
 
     def start(self):
         lcd.io_write(SET_POSITION, (self.col, self.row))
-        for i in range(self.cpus - 1):
+        for i in range(self.cores - 1):
             self.threads[i].start()
 
     def write(self, string):
@@ -240,11 +240,11 @@ if __name__ == "__main__":
         lcd.io_write(SET_BLINK, '0')
         thread1 = TimeThread(lcd, 0, 0)
         thread2 = HeartBeatThread(lcd, 12, 1)
-        thread3 = ScrollingThread(lcd)
+        # thread3 = ScrollingThread(lcd)
         thread4 = SystemLoad(lcd, 0, 1)
 
         thread4.start()
-        thread3.start()
+        # thread3.start()
         thread2.start()
         thread1.start()
 
@@ -256,4 +256,3 @@ if __name__ == "__main__":
         lcd.io_write(HOME, '1')
         lcd.io_write(SET_CURSOR, '0')
         lcd.io_write(SET_BLINK, '0')
-

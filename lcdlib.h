@@ -9,14 +9,14 @@
 #include <linux/types.h>
 #include <linux/semaphore.h>
 
-#define LCDI2C8574_DESCRIPTION "LCD driver for PCF8574 I2C expander"
-#define LCDI2C8574_VERSION "0.2.1"
+#define LCDI2C_DESCRIPTION "LCD driver for PCF8574 I2C expander"
+#define LCDI2C_VERSION "0.2.1"
 
 extern uint pinout[8];
 
 #define PINTR(pin) (pinout[pin])
 
-#define PIN_BACKLIGHTON     PINTR(3)
+#define PIN_BACKLIGHT       PINTR(3)
 #define PIN_EN              PINTR(2)
 #define PIN_RW              PINTR(1)
 #define PIN_RS              PINTR(0)
@@ -36,7 +36,8 @@ extern uint pinout[8];
 #define LCD_CMD_SETDDRAMADDR    (7)
 
 #define DEFAULT_CHIP_ADDRESS (0x27)
-#define LCD_BUFFER_SIZE (0x68) //20 columns * 4 rows + 4 extra chars
+#define LCD_BUFFER_SIZE (0x68)   //20 columns * 4 rows + 4 extra chars
+#define LCD_MAX_LINE_LENGTH (40) //Maximum line lenght in characters (usually less than 40)
 #define LCD_DEFAULT_COLS (16)
 #define LCD_DEFAULT_ROWS (2)
 #define LCD_DEFAULT_ORGANIZATION LCD_TOPO_16x2
@@ -48,6 +49,7 @@ extern uint pinout[8];
 #define LCD_HOME                (1 << LCD_CMD_HOME)
 #define LCD_CGRAM_SET           ((1 << LCD_CMD_SETCGRAMADDR))
 #define LCD_DDRAM_SET           ((1 << LCD_CMD_SETDDRAMADDR))
+#define LCD_DDRAM_ADDR          (0x80)
 
 //For LCD_ENTRYMODE
 #define LCD_EM_SHIFTINC         ((1 << LCD_CMD_ENTRYMODE) | (1 << 1))
@@ -151,13 +153,28 @@ typedef struct lcd_organization
     const char *toponame;
 } LcdOrganization_t;
 
+typedef struct lcdi2c_driver
+{
+    struct i2c_client *client;
+    struct class *lcdi2c_class;
+    struct device *lcdi2c_device;
+    struct semaphore sem;
+    int minor;
+    int major;
+    int use_cnt;
+    int open_cnt;
+} Lcdi2cDriver_t;
+
+typedef u8 LcdBuffer_t[LCD_BUFFER_SIZE];
+typedef u8 CustomChar_t[8];
+typedef u8 LcdLineLength_t[LCD_MAX_LINE_LENGTH];
+typedef u8 LcdPosition_t[2];
+
 typedef struct lcddata
 {
-    struct i2c_client *handle;
-    struct semaphore sem;
-    int major;
-
+    Lcdi2cDriver_t driver_data;
     LcdOrganization_t organization;
+
     u8 backlight;
     u8 cursor;
     u8 blink;
@@ -165,12 +182,9 @@ typedef struct lcddata
     u8 row;
     u8 display_control;
     u8 display_function;
-    u8 display_mode;
     u8 show_welcome_screen;
-    u8 buffer[LCD_BUFFER_SIZE];
-    u8 custom_chars[8][8];
-    u16 open_cnt;
-    u8 use_cnt;
+    LcdBuffer_t buffer;
+    CustomChar_t custom_chars[8];
     char welcome[16];
 } LcdHandler_t;
 
@@ -190,5 +204,6 @@ void lcdclear(LcdHandler_t *lcd);
 void lcdscrollvert(LcdHandler_t *lcd, u8 direction);
 void lcdscrollhoriz(LcdHandler_t *lcd, u8 direction);
 void lcdcustomchar(LcdHandler_t *lcd, u8 num, const u8 *bitmap);
+u8 lcdsendbuffer(LcdHandler_t *lcd, const char *data, u8 len);
 
 #endif //LCDI2C_LCDLIB_H

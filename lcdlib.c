@@ -26,8 +26,8 @@ void _udelay_(u32 usecs) {
  *
  */
 static void _buswrite(LcdHandler_t *lcd, u8 data) {
-    data |= lcd->backlight ? (1 << PIN_BACKLIGHTON) : 0;
-    LOWLEVEL_WRITE(lcd->handle, data);
+    data |= lcd->backlight ? (1 << PIN_BACKLIGHT) : 0;
+    LOWLEVEL_WRITE(lcd->driver_data.client, data);
 }
 
 /**
@@ -84,9 +84,9 @@ static void lcdsend(LcdHandler_t *lcd, u8 value, u8 mode) {
  *
  */
 void lcdflushbuffer(LcdHandler_t *lcd) {
-    u8 col = lcd->column, row = lcd->row, i;
+    u8 col = lcd->column, row = lcd->row;
 
-    for (i = 0; i < (lcd->organization.columns * lcd->organization.rows); i++) {
+    for (u8 i = 0; i < (lcd->organization.columns * lcd->organization.rows); i++) {
         lcdcommand(lcd, LCD_DDRAM_SET + ITOMEMADDR(lcd, i));
         lcdsend(lcd, lcd->buffer[i], (1 << PIN_RS));
     }
@@ -151,7 +151,7 @@ void lcdsetcursor(LcdHandler_t *lcd, u8 column, u8 row) {
  */
 void lcdsetbacklight(LcdHandler_t *lcd, u8 backlight) {
     lcd->backlight = backlight;
-    _buswrite(lcd, lcd->backlight ? (1 << PIN_BACKLIGHTON) : 0);
+    _buswrite(lcd, lcd->backlight ? (1 << PIN_BACKLIGHT) : 0);
 }
 
 /**
@@ -342,14 +342,13 @@ void lcdinit(LcdHandler_t *lcd, lcd_topology_t topo) {
     lcd->organization.toponame = toponames[topo];
 
     lcd->display_control = 0;
-    lcd->display_mode = 0;
 
     lcd->display_function = LCD_FS_4BITDATA | LCD_FS_1LINE | LCD_FS_5x8FONT;
     if (lcd->organization.rows > 1)
         lcd->display_function |= LCD_FS_2LINES;
 
     MSLEEP(50);
-    _buswrite(lcd, lcd->backlight ? (1 << PIN_BACKLIGHTON) : 0);
+    _buswrite(lcd, lcd->backlight ? (1 << PIN_BACKLIGHT) : 0);
     MSLEEP(100);
 
     _write4bits(lcd, (1 << PIN_DB4) | (1 << PIN_DB5));

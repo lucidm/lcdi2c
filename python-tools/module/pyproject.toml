@@ -1,0 +1,31 @@
+[project]
+name = "alphalcd"
+version = "0.2.4"
+keywords = ["lcd", "i2c", "driver", "display", "hd44780", "pcf8574"]
+authors = [
+    {name="Jarek Żok", email="jarekzok@gmail.com"},
+]
+description = "Python frontend for LCDI2C device driver"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+    "Topic :: Communications :: Email",
+]
+
+[project.urls]
+Homepage = "https://github.com/lucidm/lcdi2c"
+Repository = "https://github.com/lucidm/lcdi2c"
+Issues = "https://github.com/lucidm/lcdi2c/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+lcddisp = "lcdi2c.lcddisp:main"
