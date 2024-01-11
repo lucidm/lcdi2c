@@ -159,7 +159,7 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
         lcdprint(lcdi2c_gDescriptor, lcdi2c_gDescriptor->welcome);
     }
 
-    dev_info(&client->dev, "Registered LCD device with %u-cols x %u-rows on bus 0x%X at address 0x%X",
+    dev_info(&client->dev, "Registered LCD display with %u-columns x %u-rows on bus 0x%X at address 0x%X",
              lcdi2c_gDescriptor->organization.columns,
              lcdi2c_gDescriptor->organization.rows, client->adapter->nr, client->addr);
     return 0;
@@ -181,46 +181,53 @@ static void lcdi2c_remove(struct i2c_client *client) {
 static int lcdi2c_register(struct i2c_client *client) {
     LcdHandler_t *lcd_handler = i2c_get_clientdata(client);
 
-    lcd_handler->driver_data.major = register_chrdev(lcd_handler->driver_data.major, DEVICE_NAME, &lcdi2c_fops);
-    if (lcd_handler->driver_data.major < 0) {
-        dev_err(&client->dev, "failed to register device: %d\n", lcd_handler->driver_data.major);
-        goto failed_chrdev;
+    if (alloc_chrdev_region(&lcd_handler->driver_data.major, 0, 1, DEVICE_NAME) < 0) {
+        dev_err(&client->dev, "failed to allocate major number\n");
+        return -1;
     }
 
     lcd_handler->driver_data.lcdi2c_class = class_create(THIS_MODULE, DEVICE_CLASS_NAME);
     if (IS_ERR(lcd_handler->driver_data.lcdi2c_class)) {
         dev_warn(&client->dev, "class creation failed %s\n", DEVICE_CLASS_NAME);
-        goto failed_class;
+        goto classError;
     }
 
-    lcd_handler->driver_data.lcdi2c_class->dev_uevent = lcdi2c_dev_uevent;
+    lcd_handler->driver_data.minor = lcd_handler->driver_data.major & MINORMASK;
 
+    lcd_handler->driver_data.lcdi2c_class->dev_uevent = lcdi2c_dev_uevent;
     lcd_handler->driver_data.lcdi2c_device = device_create(lcd_handler->driver_data.lcdi2c_class,
                                                            NULL,
-                                                           MKDEV(lcd_handler->driver_data.major,
-                                                                 lcd_handler->driver_data.minor),
+                                                           lcd_handler->driver_data.major,
                                                            NULL,
                                                            DEVICE_NAME);
     if (IS_ERR(lcd_handler->driver_data.lcdi2c_device)) {
         dev_warn(&client->dev, "device %s creation failed\n", DEVICE_NAME);
-        goto failed_device;
+        goto fileError;
+    }
+
+    cdev_init(&lcd_handler->driver_data.cdev, &lcdi2c_fops);
+
+    if (cdev_add(&lcd_handler->driver_data.cdev, lcd_handler->driver_data.major, 1) < 0) {
+        dev_warn(&client->dev, "cdev_add failed\n");
+        goto addError;
     }
 
     if (sysfs_create_group(&lcd_handler->driver_data.lcdi2c_device->kobj, &i2clcd_device_attr_group)) {
         dev_warn(&client->dev, "device attribute group creation failed\n");
-        goto failed_device;
+        goto addError;
     }
 
-    dev_info(&client->dev, "registered with major %u\n", lcd_handler->driver_data.major);
+    dev_info(&client->dev, "registered with Major: %u Minor: %u\n", lcd_handler->driver_data.major >> 20,
+             lcd_handler->driver_data.major & MINORMASK);
 
     return 0;
 
-    failed_device:
-    class_unregister(lcd_handler->driver_data.lcdi2c_class);
+addError:
+    device_destroy(lcd_handler->driver_data.lcdi2c_class, lcd_handler->driver_data.major);
+fileError:
     class_destroy(lcd_handler->driver_data.lcdi2c_class);
-    failed_class:
-    unregister_chrdev(lcd_handler->driver_data.major, DEVICE_NAME);
-    failed_chrdev:
+classError:
+    unregister_chrdev_region(lcd_handler->driver_data.major, 1);
     i2c_unregister_device(client);
     i2c_del_driver(&lcdi2c_driver);
     return -1;
@@ -230,12 +237,12 @@ static int lcdi2c_register(struct i2c_client *client) {
 static void lcdi2c_unregister(struct i2c_client *client) {
     LcdHandler_t *lcd_handler = i2c_get_clientdata(client);
 
+    cdev_del(&lcd_handler->driver_data.cdev);
     sysfs_remove_group(&lcd_handler->driver_data.lcdi2c_device->kobj, &i2clcd_device_attr_group);
-
-    unregister_chrdev(lcd_handler->driver_data.major, DEVICE_NAME);
-    device_destroy(lcd_handler->driver_data.lcdi2c_class, MKDEV(lcd_handler->driver_data.major, 0));
+    device_destroy(lcd_handler->driver_data.lcdi2c_class, lcd_handler->driver_data.major);
     class_unregister(lcd_handler->driver_data.lcdi2c_class);
     class_destroy(lcd_handler->driver_data.lcdi2c_class);
+    unregister_chrdev_region(lcd_handler->driver_data.major, 1);
 }
 
 
@@ -266,7 +273,7 @@ static int lcdi2c_release(struct inode *_, struct file *__) {
 
 static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
                               size_t length, loff_t *offset) {
-    u8 i = 0;
+    size_t to_copy = length < LCD_BUFFER_SIZE ? length : LCD_BUFFER_SIZE, rest = 0;
 
     if (SEM_DOWN(lcdi2c_gDescriptor)) {
         return -EBUSY;
@@ -277,39 +284,31 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
         return 0;
     }
 
-    while (i < length && i < (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows)) {
-        put_user(lcdi2c_gDescriptor->buffer[i], buffer++);
-        lcdi2c_gDescriptor->driver_data.use_cnt++;
-        i++;
-    }
+    rest = copy_to_user(buffer, lcdi2c_gDescriptor->buffer, to_copy);
 
-    i %= (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows);
-    ITOP(lcdi2c_gDescriptor, i, lcdi2c_gDescriptor->column, lcdi2c_gDescriptor->row);
-    lcdsetcursor(lcdi2c_gDescriptor, lcdi2c_gDescriptor->column, lcdi2c_gDescriptor->row);
-    (*offset) = i;
+    *offset = to_copy - rest;
     SEM_UP(lcdi2c_gDescriptor);
 
-    return i;
+    return to_copy - rest;
 }
 
 static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer,
                                size_t length, loff_t *offset) {
-    u8 i, str[LCD_BUFFER_SIZE];
+
+    size_t to_copy = length < LCD_BUFFER_SIZE ? length : LCD_BUFFER_SIZE, rest = 0;
 
     if (SEM_DOWN(lcdi2c_gDescriptor)) {
         return -EBUSY;
     }
 
-    for (i = 0;
-         i < length &&
-         i < (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows);
-         i++)
-        get_user(str[i], buffer + i);
-    str[i] = 0;
-    (*offset) = lcdprint(lcdi2c_gDescriptor, str);
+    rest = copy_from_user(lcdi2c_gDescriptor->buffer, buffer, to_copy);
+    lcdi2c_gDescriptor->buffer[to_copy - rest] = '\0';
+    lcdprint(lcdi2c_gDescriptor, lcdi2c_gDescriptor->buffer);
 
+    *offset = to_copy - rest;
     SEM_UP(lcdi2c_gDescriptor);
-    return i;
+
+    return to_copy - rest;
 }
 
 loff_t lcdi2c_lseek(struct file *file, loff_t offset, int orig) {

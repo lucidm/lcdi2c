@@ -126,8 +126,7 @@ def main():
 
     parser.add_argument(
         "--autoscroll",
-        help="Turn on/off autoscroll vertically (default: off). If enabled the text will scroll up when the last line"
-             "is full",
+        help="Turn on/off autoscroll vertically. If enabled the text will scroll up giving a space to the new line",
         action=argparse.BooleanOptionalAction,
         default=False,
     )

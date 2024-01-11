@@ -2,6 +2,7 @@ Linux kernel module for alphanumeric LCDs using HD44780 with PCF8574 I2C IO expa
 
 Prior to compilation, make sure you have linux-headers package installed. 
 For RaspberryPi with Debian-based distro run ```sudo apt install linux-headers-rpi``` to install required package.
+Or ```sudo apt install linux-headers-$(uname -r)``` for other Debian-based distros.
 
 requirements
 ------------

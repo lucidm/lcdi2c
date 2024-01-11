@@ -5,6 +5,7 @@
 #ifndef LCDI2C_LCDLIB_H
 #define LCDI2C_LCDLIB_H
 
+#include <linux/cdev.h>
 #include <linux/i2c.h>
 #include <linux/types.h>
 #include <linux/semaphore.h>
@@ -158,6 +159,7 @@ typedef struct lcdi2c_driver
     struct i2c_client *client;
     struct class *lcdi2c_class;
     struct device *lcdi2c_device;
+    struct cdev cdev;
     struct semaphore sem;
     int minor;
     int major;
