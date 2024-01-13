@@ -11,6 +11,7 @@
                 compatible = "pcf8574,lcdi2c";
                 reg = <0x27>;
                 status = "okay";
+                topology = <0x03>;
             };
         };
     };

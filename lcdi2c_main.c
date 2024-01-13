@@ -30,15 +30,13 @@ module_param(topo, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(swscreen, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(wscreen, charp, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 
-//MODULE_PARAM_DESC(bus, " I2C bus number, default 0 - Will be taken from device tree");
-//MODULE_PARAM_DESC(address, " I2C module address, default 0x00 - Will be taken from device tree");
 MODULE_PARM_DESC(pinout, " I2C module pinout configuration, eight "
                          "numbers\n\t\trepresenting following LCD module"
                          "pins in order: RS,RW,E,D4,D5,D6,D7,\n"
                          "\t\tdefault 0,1,2,3,4,5,6,7");
 MODULE_PARM_DESC(cursor, " Show cursor at start 1 - Yes, 0 - No, default 1");
 MODULE_PARM_DESC(blink, " Blink cursor 1 - Yes, 0 - No, defualt 1");
-MODULE_PARM_DESC(topo, " Display organization, following values are currently supported:\n"
+MODULE_PARM_DESC(topo, " Display organization, following values are supported:\n"
                        "\t\t0 - 40x2\n"
                        "\t\t1 - 20x4\n"
                        "\t\t2 - 20x2\n"
@@ -47,7 +45,7 @@ MODULE_PARM_DESC(topo, " Display organization, following values are currently su
                        "\t\t5 - 16x1 Type 1\n"
                        "\t\t6 - 16x1 Type 2\n"
                        "\t\t7 - 8x2\n"
-                       "\t\tDefault set to 16x2");
+                       "\t\tDefault set to 4 (16x2)");
 MODULE_PARM_DESC(swscreen, " Show welcome screen on load, 1 - Yes, 0 - No, default 0");
 MODULE_PARM_DESC(wscreen, " Welcome screen string, default \""DEFAULT_WS"\"");
 
@@ -136,6 +134,13 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
 
     if (!lcdi2c_gDescriptor)
         return -ENOMEM;
+
+    if (device_property_present(&client->dev, "topology")) {
+        if (device_property_read_u32(&client->dev, "topology", &topo)) {
+            dev_err(&client->dev, "topology property read failed\n");
+            return -EINVAL;
+        }
+    }
 
     sema_init(&lcdi2c_gDescriptor->driver_data.sem, 1);
     lcdi2c_gDescriptor->driver_data.client = client;
