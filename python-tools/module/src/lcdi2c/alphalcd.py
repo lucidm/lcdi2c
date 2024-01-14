@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+########################################################################################################################
+#
+#   AlphaLCD - Python library for Alphanumeric LCD displays with I2C hat
+#   Author: Jarek Zok <jarek.zok at gmail.com>
+#   Version: 1.x
+#   Date: 2024-01-14
+#   License: GPL3
+#
+########################################################################################################################
+
 import array
 import fcntl
 import yaml
@@ -12,11 +22,17 @@ META_FILE_PATH = "/sys/class/alphalcd/lcdi2c/meta"
 
 
 class LCDMisc(Enum):
+    """
+    LCDMisc class contains miscellaneous constants used by IOCTL arguments.
+    """
     LCD_LINE_LEN = 40
     LCD_BUFFER_LEN = 20 * 4 + 4
 
 
 class LCDCharArgs(Structure):
+    """
+    Structure for IOCTL argument with single character argument.
+    """
     _fields_ = [
         ("value", c_uint8),
     ]
@@ -28,6 +44,9 @@ class LCDCharArgs(Structure):
 
 
 class LCDBoolArgs(Structure):
+    """
+    Structure for IOCTL argument with single boolean argument (value is cast to char value of 0 or 1).
+    """
     _fields_ = [
         ("value", c_bool),
     ]
@@ -39,6 +58,10 @@ class LCDBoolArgs(Structure):
 
 
 class LCDLineArgs(Structure):
+    """
+    Structure for IOCTL argument with single line argument with default line length.
+    If line is shorter than LCD_LINE_LEN, it is padded with spaces.
+    """
     _fields_ = [
         ("line", c_char * LCDMisc.LCD_LINE_LEN.value),
     ]
@@ -50,6 +73,11 @@ class LCDLineArgs(Structure):
 
 
 class LCDScrollArgs(Structure):
+    """
+    Structure for IOCTL argument with single line argument with default line length.
+    If line is shorter than LCD_LINE_LEN, it is padded with spaces.
+    Direction is encoded in the first byte of the line argument.
+    """
     _fields_ = [
         ("direction", c_uint32),
         ("line", c_char * LCDMisc.LCD_LINE_LEN.value),
@@ -64,6 +92,10 @@ class LCDScrollArgs(Structure):
 
 
 class LCDBufferArgs(Structure):
+    """
+    Structure for IOCTL argument with single buffer argument with default buffer length.
+    If buffer is shorter than LCD_BUFFER_LEN, it is padded with spaces.
+    """
     _fields_ = [
         ("buffer", c_char * LCDMisc.LCD_BUFFER_LEN.value),
     ]
@@ -75,6 +107,9 @@ class LCDBufferArgs(Structure):
 
 
 class LCDPositionArgs(Structure):
+    """
+    Structure for IOCTL argument with single position argument with column and row.
+    """
     _fields_ = [
         ("column", c_uint8),
         ("row", c_uint8),
@@ -89,6 +124,10 @@ class LCDPositionArgs(Structure):
 
 
 class LCDCustomCharArgs(Structure):
+    """
+    Structure for IOCTL argument with single custom character argument with index and data.
+    Data containt 8 bytes representing bitmap of the custom character which number is set in index.
+    """
     _fields_ = [
         ("index", c_uint8),
         ("data", c_char * 8),
@@ -103,6 +142,9 @@ class LCDCustomCharArgs(Structure):
 
 
 class LCDCommand(Enum):
+    """
+    LCDCommand class contains all IOCTL names used for communication with the driver.
+    """
     GET_VERSION = "GETVERSION"
     GET_CHAR = "GETCHAR"
     SET_CHAR = "SETCHAR"
@@ -134,17 +176,18 @@ class LCDCommand(Enum):
 
 
 class LCDDirection(Enum):
+    """
+    Represents IOCTL direction.
+    """
     NONE = 0
     WRITE = 1
     READ = 2
     WRITEREAD = 3
 
 
-class IOCTLDataType(Enum):
-    CHAR = 1
-    STRING = 2
-
-
+# IOCTL format dictionary, contains IOCTL format string determines length in bytes for each
+# IOCTL argument structure. First element contains format string used by struct.pack/unpack functions
+# Second element is the argument structure class used in call.
 IOCTLFMT = {
     LCDCommand.GET_CHAR: ("1B", LCDCharArgs),
     LCDCommand.SET_CHAR: ("1B", LCDCharArgs),
@@ -182,20 +225,20 @@ class AlphaLCDIOError(Exception):
 class IOCTLBase:
     """
     Base class for IOCTL calls.
-    Derived classes must implement __call__ method with no arguments.
-    Constructor arguments:
-        ioctl_name: IOCTL name
-        ioctl_value: IOCTL value
-        nr: IOCTL number
-        base: IOCTL base
-        length: IOCTL length
-        direction: IOCTL direction (LCDDirection instance)
-        fmt: struct.pack format string (optional) - if not specified, the default bytes format is used
-    set_value() method arguments:
-        file: file descriptor
-        value: IOCTL name (one of LCDCommand values)
+    Derived classes must implement __call__ method with **kwargs depending on fields names of actual
     """
     def __init__(self, ioctl_name: str, ioctl_value: int, nr: int, base: int, length: int, direction: LCDDirection, fmt: str = None):
+        """
+        Constructor for IOCTLBase class.
+        All arguments are passed from IOCTLManager class which creates instances of IOCTLBase derivatives.
+        :param ioctl_name: IOCTL name
+        :param ioctl_value: IOCTL value
+        :param nr: IOCTL number
+        :param base: IOCTL base
+        :param length: IOCTL length
+        :param direction: IOCTL direction (LCDDirection instance)
+        :param fmt: tuple containing struct.pack format string (optional) and IOCTL argument structure class
+        """
         self.fmt = fmt
         self.ioctl_name = ioctl_name
         self.ioctl_value = ioctl_value
@@ -262,6 +305,10 @@ class IOCTLWriteRead(IOCTLBase):
 
 
 class IOCTLDirToIOCTLDatatype(Enum):
+    """
+    Each IOCTL implements one of the IOCTLBase derivatives depending on the IOCTL direction.
+    Here is the mapping between IOCTL direction and IOCTLBase derivative.
+    """
     NONE = IOCTL
     WRITE = IOCTLWrite
     READ = IOCTLRead
@@ -654,7 +701,7 @@ class LCDPrint:
 
 
 if __name__ == "__main__":
-    import time
+    # Example usage
     lcd = AlphaLCD()
     with LCDPrint(lcd) as f:
         try:

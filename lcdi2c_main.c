@@ -673,6 +673,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                             "       columns: %d\n"
                             "       rows-offsets: {%s}\n"
                             "       raw_data-len: %d\n"
+                            "       line-len: %d\n"
                             "       pins: {rs: %d, rw: %d, e: %d, backlight: %d,}\n"
                             "       data-lines: {4: %d, 5: %d, 6: %d, 7: %d,}\n"
                             "       busno: %d\n"
@@ -685,6 +686,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                          lcdi2c_gDescriptor->organization.columns,
                          lines,
                          LCD_BUFFER_SIZE,
+                         LCD_MAX_LINE_LENGTH,
                          PIN_RS, PIN_RW, PIN_EN,
                          PIN_BACKLIGHT,
                          PIN_DB4, PIN_DB5, PIN_DB6, PIN_DB7,
