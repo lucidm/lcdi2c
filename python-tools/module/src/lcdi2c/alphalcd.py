@@ -2,14 +2,104 @@
 
 import array
 import fcntl
-import struct
-
 import yaml
 
+from ctypes import c_char, c_bool, c_uint8, c_uint32, Structure
 from enum import Enum
 from typing import Tuple, Iterable
 
 META_FILE_PATH = "/sys/class/alphalcd/lcdi2c/meta"
+
+
+class LCDMisc(Enum):
+    LCD_LINE_LEN = 40
+    LCD_BUFFER_LEN = 20 * 4 + 4
+
+
+class LCDCharArgs(Structure):
+    _fields_ = [
+        ("value", c_uint8),
+    ]
+
+    def __init__(self, value: int = None):
+        super().__init__()
+        if value is not None:
+            self.value = value
+
+
+class LCDBoolArgs(Structure):
+    _fields_ = [
+        ("value", c_bool),
+    ]
+
+    def __init__(self, value: bool = None):
+        super().__init__()
+        if value is not None:
+            self.value = value
+
+
+class LCDLineArgs(Structure):
+    _fields_ = [
+        ("line", c_char * LCDMisc.LCD_LINE_LEN.value),
+    ]
+
+    def __init__(self, line: str = None):
+        super().__init__()
+        if line:
+            self.line = (line + " " * (LCDMisc.LCD_LINE_LEN.value - len(line))).encode("ascii")
+
+
+class LCDScrollArgs(Structure):
+    _fields_ = [
+        ("direction", c_uint32),
+        ("line", c_char * LCDMisc.LCD_LINE_LEN.value),
+    ]
+
+    def __init__(self, line: str = None, direction: bool = None):
+        super().__init__()
+        if line:
+            self.line = (line + " " * (LCDMisc.LCD_LINE_LEN.value - len(line))).encode("ascii")
+        if direction is not None:
+            self.direction = direction
+
+
+class LCDBufferArgs(Structure):
+    _fields_ = [
+        ("buffer", c_char * LCDMisc.LCD_BUFFER_LEN.value),
+    ]
+
+    def __init__(self, buffer: str = None):
+        super().__init__()
+        if buffer:
+            self.buffer = (buffer + " " * (LCDMisc.LCD_BUFFER_LEN.value - len(buffer))).encode("ascii")
+
+
+class LCDPositionArgs(Structure):
+    _fields_ = [
+        ("column", c_uint8),
+        ("row", c_uint8),
+    ]
+
+    def __init__(self, column: int = None, row: int = None):
+        super().__init__()
+        if column is not None:
+            self.column = column
+        if row is not None:
+            self.row = row
+
+
+class LCDCustomCharArgs(Structure):
+    _fields_ = [
+        ("index", c_uint8),
+        ("data", c_char * 8),
+    ]
+
+    def __init__(self, index: int = None, data: Iterable[int] = None):
+        super().__init__()
+        if index is not None:
+            self.index = index
+        if data is not None:
+            self.data = array.array("B", data).tobytes()
 
 
 class LCDCommand(Enum):
@@ -29,6 +119,7 @@ class LCDCommand(Enum):
     GET_BLINK = "GETBLINK"
     SET_BLINK = "SETBLINK"
     SCROLL_HZ = "SCROLLHZ"
+    SCROLL_VERT = "SCROLLVERT"
     GET_CUSTOMCHAR = "GETCUSTOMCHAR"
     SET_CUSTOMCHAR = "SETCUSTOMCHAR"
     CLEAR = "CLEAR"
@@ -54,6 +145,32 @@ class IOCTLDataType(Enum):
     STRING = 2
 
 
+IOCTLFMT = {
+    LCDCommand.GET_CHAR: ("1B", LCDCharArgs),
+    LCDCommand.SET_CHAR: ("1B", LCDCharArgs),
+    LCDCommand.GET_LINE: (f"{LCDMisc.LCD_LINE_LEN.value}B", LCDLineArgs),
+    LCDCommand.SET_LINE: (f"{LCDMisc.LCD_LINE_LEN.value}B", LCDLineArgs),
+    LCDCommand.GET_BUFFER: (f"{LCDMisc.LCD_BUFFER_LEN.value}B", LCDBufferArgs),
+    LCDCommand.SET_BUFFER: (f"{LCDMisc.LCD_BUFFER_LEN.value}B", LCDBufferArgs),
+    LCDCommand.GET_BACKLIGHT: ("1B", LCDBoolArgs),
+    LCDCommand.SET_BACKLIGHT: ("1B", LCDBoolArgs),
+    LCDCommand.GET_CURSOR: ("1B", LCDBoolArgs),
+    LCDCommand.SET_CURSOR: ("1B", LCDBoolArgs),
+    LCDCommand.GET_BLINK: ("1B", LCDBoolArgs),
+    LCDCommand.SET_BLINK: ("1B", LCDBoolArgs),
+    LCDCommand.SCROLL_HZ: ("1B", LCDBoolArgs),
+    LCDCommand.SET_POSITION: ("2B", LCDPositionArgs),
+    LCDCommand.GET_POSITION: ("2B", LCDPositionArgs),
+    LCDCommand.SET_CUSTOMCHAR: ("1B8B", LCDCustomCharArgs),
+    LCDCommand.GET_CUSTOMCHAR: ("1B8B", LCDCustomCharArgs),
+    LCDCommand.SCROLL_VERT: (f"1L{LCDMisc.LCD_LINE_LEN.value}B", LCDScrollArgs),
+    LCDCommand.RESET: ("0B", None),
+    LCDCommand.HOME: ("0B", None),
+    LCDCommand.CLEAR: ("0B", None),
+    LCDCommand.GET_VERSION: ("0B", None),
+}
+
+
 class AlphaLCDInitError(Exception):
     pass
 
@@ -73,29 +190,19 @@ class IOCTLBase:
         base: IOCTL base
         length: IOCTL length
         direction: IOCTL direction (LCDDirection instance)
+        fmt: struct.pack format string (optional) - if not specified, the default bytes format is used
     set_value() method arguments:
         file: file descriptor
         value: IOCTL name (one of LCDCommand values)
     """
-    def __init__(self, ioctl_name: str, ioctl_value: int, nr: int, base: int, length: int, direction: LCDDirection):
-        self.file = None
-        self.value = None
+    def __init__(self, ioctl_name: str, ioctl_value: int, nr: int, base: int, length: int, direction: LCDDirection, fmt: str = None):
+        self.fmt = fmt
         self.ioctl_name = ioctl_name
         self.ioctl_value = ioctl_value
         self.nr = nr
         self.base = base
         self.length = length
         self.direction: LCDDirection = direction
-
-    def set_value(self, file, value: str | Tuple[int, ...] | None = None):
-        """
-        Set IOCTL value and file descriptor.
-        :param file: File descriptor
-        :param value: Value to write
-        :return:
-        """
-        self.file = file
-        self.value = value
 
     def __str__(self):
         """
@@ -111,8 +218,8 @@ class IOCTL(IOCTLBase):
     """
     IOCTL call with no arguments and no value returned.
     """
-    def __call__(self):
-        return fcntl.ioctl(self.file, self.ioctl_value)
+    def __call__(self, file, **__):
+        return fcntl.ioctl(file, self.ioctl_value)
 
 
 class IOCTLWrite(IOCTLBase):
@@ -120,17 +227,11 @@ class IOCTLWrite(IOCTLBase):
     IOCTL call with value to write.
     IOCTLs usually have a fixed length, so the value is padded with spaces or truncated to fit.
     """
-    def __call__(self):
-        if len(self.value) < self.length:
-            self.value += " " * (self.length - len(self.value))
-
-        length = self.length if self.length < len(self.value) else len(self.value)
-        fmt = f"{length}B"
-        if isinstance(self.value, str):
-            s = struct.pack(fmt, *map(ord, self.value[:length]))
-        elif isinstance(self.value, tuple):
-            s = struct.pack(fmt, *self.value[:length])
-        return fcntl.ioctl(self.file, self.ioctl_value, s)
+    def __call__(self, file, **kwargs):
+        ioctl_arg = self.fmt[1](**kwargs)
+        a = array.array("B", bytearray(ioctl_arg))
+        fcntl.ioctl(file, self.ioctl_value, a, True)
+        return self.fmt[1].from_buffer_copy(a)
 
 
 class IOCTLRead(IOCTLBase):
@@ -141,11 +242,11 @@ class IOCTLRead(IOCTLBase):
     depending on the LCD width. For example in a case of GET_LINE the actual length can be determined from number
     of columns.
     """
-    def __call__(self):
-        fmt = f"{self.length}B"
-        buffer = array.array('B', [0 for _ in range(self.length)])
-        fcntl.ioctl(self.file, self.ioctl_value, buffer, True)
-        return struct.unpack(fmt, buffer)
+    def __call__(self, file, **kwargs):
+        ioctl_arg = self.fmt[1](**kwargs)
+        a = array.array("B", bytearray(ioctl_arg))
+        fcntl.ioctl(file, self.ioctl_value, a, True)
+        return self.fmt[1].from_buffer_copy(a)
 
 
 class IOCTLWriteRead(IOCTLBase):
@@ -153,18 +254,11 @@ class IOCTLWriteRead(IOCTLBase):
     IOCTL call with value to write and value to read.
     Function expects a tuple of ints or a string which is converted to array of bytes.
     """
-    def __call__(self):
-        length = self.length if self.length < len(self.value) else len(self.value)
-        fmt = f"{length}B"
-        if isinstance(self.value, str):
-            s = struct.pack(fmt, *map(ord, self.value[:length]))
-        elif isinstance(self.value, tuple):
-            s = struct.pack(fmt, *self.value[:length])
-        else:
-            s = struct.pack(fmt, self.value)
-
-        fcntl.ioctl(self.file, self.ioctl_value, s, True)
-        return struct.unpack(fmt, s)
+    def __call__(self, file, **kwargs):
+        ioctl_arg = self.fmt[1](**kwargs)
+        a = array.array("B", bytearray(ioctl_arg))
+        fcntl.ioctl(file, self.ioctl_value, a, True)
+        return self.fmt[1].from_buffer_copy(a)
 
 
 class IOCTLDirToIOCTLDatatype(Enum):
@@ -187,10 +281,12 @@ class IOCTLManager(IOCTLBase):
                                                                                value,
                                                                                nr,
                                                                                ioc_type,
-                                                                               length, LCDDirection(direction))
+                                                                               length,
+                                                                               LCDDirection(direction),
+                                                                               IOCTLFMT.get(LCDCommand(ioctl)))
             self.ioctls.update({ioctl: call})
 
-    def __call__(self, ioctl_name: str, file, value: Iterable | None = None):
+    def __call__(self, ioctl_name: str, file, **kwargs):
         """
         Call IOCTL by name.
         :param ioctl_name:
@@ -201,12 +297,10 @@ class IOCTLManager(IOCTLBase):
         if ioctl_name not in self.ioctls:
             raise AlphaLCDIOError(f"IOCTL {ioctl_name} not found")
 
-        if value is None and self.ioctls[ioctl_name].direction in (LCDDirection.WRITEREAD,
-                                                                   LCDDirection.WRITE):
+        if not kwargs and self.ioctls[ioctl_name].direction in (LCDDirection.WRITEREAD,
+                                                                LCDDirection.WRITE):
             raise AlphaLCDIOError(f"IOCTL {ioctl_name} requires a value")
-
-        self.ioctls[ioctl_name].set_value(file, value)
-        return self.ioctls[ioctl_name]()
+        return self.ioctls[ioctl_name](file, **kwargs)
 
     def __str__(self):
         """
@@ -248,7 +342,7 @@ class AlphaLCD:
                 self.columns = p["metadata"]["columns"]
                 self.rows = p["metadata"]["rows"]
                 self.ioctl_manager = IOCTLManager(p["metadata"]["ioctls"])
-                self.buffer_length = p["metadata"]["buffer-len"]
+                self.buffer_length = p["metadata"]["raw_data-len"]
                 if not (bus or address):
                     self.bus = p["metadata"]["busno"]
                     self.address = p["metadata"]["reg"]
@@ -262,8 +356,8 @@ class AlphaLCD:
         except FileNotFoundError:
             raise AlphaLCDInitError(f"Device not found at bus {self.bus} address {self.address}")
 
-    def __call__(self, ioctl_name: str, value: Iterable | None = None):
-        return self.ioctl_manager(ioctl_name, self.file, value)
+    def __call__(self, ioctl_name: str, **kwargs):
+        return self.ioctl_manager(ioctl_name, self.file, **kwargs)
 
     def __enter__(self):
         self.open(file=self.device_path, mode=self.mode)
@@ -319,24 +413,25 @@ class LCDCursor:
         self.set(None, row)
 
     def get(self):
-        self._col, self._row = self.lcd(LCDCommand.GET_POSITION.value)[:2]
+        ret = self.lcd(LCDCommand.GET_POSITION.value)
+        self._col, self._row = ret.column, ret.row
         return self._col, self._row
 
-    def set(self, col: int, row: int):
-        if (col is None) and (row is None):
+    def set(self, column: int, row: int):
+        if (column is None) and (row is None):
             return self.get()
 
-        if col is not None:
-            if (col < 0) or (col > self.lcd.columns):
-                col = self.lcd.columns - 1
-            self._col = col
+        if column is not None:
+            if (column < 0) or (column > self.lcd.columns):
+                column = self.lcd.columns - 1
+            self._col = column
 
         if row is not None:
             if (row < 0) or (row > self.lcd.rows):
                 row = self.lcd.rows - 1
             self._row = row
 
-        self.lcd(LCDCommand.SET_POSITION.value, (self._col, self._row))
+        self.lcd(LCDCommand.SET_POSITION.value, column=self._col, row=self._row)
 
 
 class LCDPrint:
@@ -378,7 +473,7 @@ class LCDPrint:
         :param row: if None is given the current row is used
         :return: current cursor position (a tuple), marking the end of the text printed
         """
-        self.position.set(col, row)
+        self.position.set(column=col, row=row)
         self.lcd.write(string)
         self.lcd.flush()
         self.position.get()
@@ -416,7 +511,7 @@ class LCDPrint:
         :param blink:
         :return: None
         """
-        self.lcd(LCDCommand.SET_BLINK.value, '1' if blink else '0')
+        self.lcd(LCDCommand.SET_BLINK.value, value=1 if blink else 0)
 
     @property
     def cursor(self) -> bool:
@@ -433,15 +528,25 @@ class LCDPrint:
         :param cursor:
         :return: None
         """
-        self.lcd(LCDCommand.SET_CURSOR.value, '1' if cursor else '0')
+        self.lcd(LCDCommand.SET_CURSOR.value, value=1 if cursor else 0)
 
-    def scroll(self, scroll: bool) -> None:
+    def scroll(self, direction: bool) -> None:
         """
         Set the scroll direction and scrolls the screen horizontally by one character each call.
-        :param scroll: True to scroll left, False to scroll right
+        :param direction: True to scroll left, False to scroll right
         :return: None
         """
-        self.lcd(LCDCommand.SCROLL_HZ.value, '1' if scroll else '0')
+        self.lcd(LCDCommand.SCROLL_HZ.value, value=1 if direction else 0)
+
+    def scroll_vert(self, line: str, direction: bool) -> None:
+        """
+        Set the scroll direction and scrolls the screen vertically by one row each call.
+        :param line: Replace free line with this string
+        :param direction: True to scroll up (last line become empty), False to scroll down (first line become empty)
+        :return: None
+        """
+        self.lcd(LCDCommand.SCROLL_VERT.value, line=line, direction=1 if direction else 0)
+
 
     @property
     def backlight(self) -> bool:
@@ -458,7 +563,7 @@ class LCDPrint:
         :param backlight:
         :return:
         """
-        self.lcd(LCDCommand.SET_BACKLIGHT.value, '1' if backlight else '0')
+        self.lcd(LCDCommand.SET_BACKLIGHT.value, value=1 if backlight else 0)
 
     def get_char(self, col: int = None, row: int = None) -> int:
         """
@@ -479,7 +584,7 @@ class LCDPrint:
         :return: None
         """
         self.position.set(col, row)
-        self.lcd(LCDCommand.SET_CHAR.value, char)
+        self.lcd(LCDCommand.SET_CHAR.value, value=char)
 
     def get_line(self, row: int) -> str:
         """
@@ -488,8 +593,8 @@ class LCDPrint:
         :return: str - line trimmed to the LCD width
         """
         self.position.set(None, row)
-        tup = self.lcd(LCDCommand.GET_LINE.value)
-        return "".join(map(chr, tup[:self.lcd.columns]))
+        ret = self.lcd(LCDCommand.GET_LINE.value)
+        return ret.line.decode("ascii").strip()
 
     def set_line(self, string: str, row: int) -> None:
         """
@@ -499,7 +604,7 @@ class LCDPrint:
         :return:
         """
         self.position.set(None, row)
-        self.lcd(LCDCommand.SET_LINE.value, string)
+        self.lcd(LCDCommand.SET_LINE.value, line=string)
 
     def get_custom_char_bin(self, char: int) -> list:
         """
@@ -509,7 +614,7 @@ class LCDPrint:
         """
         if char < 0 or char > 7:
             raise ValueError("Custom character number must be between 0 and 7")
-        return self.lcd(LCDCommand.GET_CUSTOMCHAR.value, char)
+        return self.lcd(LCDCommand.GET_CUSTOMCHAR.value, index=char)
 
     def set_custom_char_bin(self, char: int, data: list) -> None:
         """
@@ -522,22 +627,22 @@ class LCDPrint:
             raise ValueError("Custom character number must be between 0 and 7")
         if len(data) != 8:
             raise ValueError("Custom character data must be 8 bytes long")
-        self.lcd(LCDCommand.SET_CUSTOMCHAR.value, (char, data))
+        self.lcd(LCDCommand.SET_CUSTOMCHAR.value, index=char, data=data)
 
     def get_buffer(self) -> str:
         """
-        Get the whole LCD buffer and return it as a string.
-        :return: str - buffer trimmed to the LCD width and height
+        Get the whole LCD raw_data and return it as a string.
+        :return: str - raw_data trimmed to the LCD width and height
         """
-        return "".join([chr(i) for i in self.lcd(LCDCommand.GET_BUFFER.value)[:self.lcd.calculated_buffer_length]])
+        return self.lcd(LCDCommand.GET_BUFFER.value).buffer.decode("ascii")
 
     def set_buffer(self, data: str) -> None:
         """
-        Set the whole LCD buffer. Buffer will be trimmed to the LCD width and height.
+        Set the whole LCD raw_data. Buffer will be trimmed to the LCD width and height.
         :param data:
         :return:
         """
-        self.lcd(LCDCommand.SET_BUFFER.value, data)
+        self.lcd(LCDCommand.SET_BUFFER.value, buffer=data)
 
     def __enter__(self) -> "LCDPrint":
         self.lcd.open()
@@ -549,27 +654,38 @@ class LCDPrint:
 
 
 if __name__ == "__main__":
+    import time
     lcd = AlphaLCD()
     with LCDPrint(lcd) as f:
-        print(lcd.ioctl_manager)
-        f.clear()
-        f.backlight = True
-        f.cursor = True
-        f.blink = True
+        try:
+            print(lcd.ioctl_manager)
+            f.clear()
+            f.backlight = True
+            f.cursor = True
+            f.blink = True
 
-        f.print("0123456789ABCDEFGHIJ", 0, 0)
-        print(f"LINE 0:\"{f.get_line(0)}\"")
+            f.print("0123456789ABCDEFGHIJ", 0, 0)
+            print(f"LINE 0:\"{f.get_line(0)}\"")
+            f.set_line("FEEDFACEDEADBEEF", 1)
 
-        f.print("Foo Bar!", 0, 2)
-        print(f"LINE 2:\"{f.get_line(2)}\"")
-        print(f"CURSOR: {f.get_position()}")
-        print(f"Buffer:\n\t\"{f.get_buffer()}\"")
-        from pprint import pprint
+            f.print("Foo Bar!", 0, 2)
+            print(f"LINE 2:\"{f.get_line(2)}\"")
+            print(f"LINE 1:\"{f.get_line(1)}\"")
+            print(f"CURSOR: {f.get_position()}")
+            print(f"Buffer:\n\t\"{f.get_buffer()}\"")
 
-        f.clear()
-        f.set_buffer("~~~~~~~~~~~~~~~~fedcba9876543210----------------****************")
-        print(f"Buffer:\n\t\"{f.get_buffer()}\"")
-        print(f"CURSOR: {f.get_position()}")
-        f.set_position(2, 1)
-        print(f"LINE 1: {f.get_line(1)}")
-        print(f"CURSOR: {f.get_position()}")
+            f.clear()
+            f.set_buffer("~~~~~~~~~~~~~~~~fedcba9876543210----------------****************")
+            print(f"Buffer:\n\t\"{f.get_buffer()}\"")
+            print(f"CURSOR: {f.get_position()}")
+            f.set_position(2, 1)
+            print(f"LINE 1: {f.get_line(1)}")
+            print(f"CURSOR: {f.get_position()}")
+            for i in range(50):
+                f.scroll_vert(f"Line {i}", True)
+            for i in range(50):
+                f.scroll_vert(f"Line {i}", False)
+        except Exception as e:
+            print(e)
+
+

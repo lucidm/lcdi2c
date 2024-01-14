@@ -19,7 +19,7 @@ static uint blink = 0;
 static uint swscreen = 0;
 static uint pinout_cnt = 0;
 static char *wscreen = DEFAULT_WS;
-static LcdHandler_t *lcdi2c_gDescriptor;
+static LcdDescriptor_t *lcdi2c_gDescriptor;
 
 module_param(bus, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 module_param(address, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
@@ -67,9 +67,11 @@ static const IOCTLDescription_t ioControls[] = {
         {.ioctl_code = LCD_IOCTL_GETBLINK, .name = "GETBLINK"},
         {.ioctl_code = LCD_IOCTL_SETBLINK, .name = "SETBLINK"},
         {.ioctl_code = LCD_IOCTL_SCROLLHZ, .name = "SCROLLHZ"},
+        {.ioctl_code = LCD_IOCTL_SCROLLVERT, .name = "SCROLLVERT"},
         {.ioctl_code = LCD_IOCTL_GETCUSTOMCHAR, .name = "GETCUSTOMCHAR"},
         {.ioctl_code = LCD_IOCTL_SETCUSTOMCHAR, .name = "SETCUSTOMCHAR"},
         {.ioctl_code = LCD_IOCTL_CLEAR, .name = "CLEAR"},
+
 };
 
 /*
@@ -123,14 +125,14 @@ static int lcdi2c_dev_uevent(struct device *_, struct kobj_uevent_env *env) {
     return 0;
 }
 
-static void set_welcome_message(LcdHandler_t *lcdData, char *welcome_msg) {
+static void set_welcome_message(LcdDescriptor_t *lcdData, char *welcome_msg) {
     strncpy(lcdData->welcome, strlen(welcome_msg) ? welcome_msg : DEFAULT_WS, WS_MAX_LEN);
 }
 
 static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *id) {
     int ret = 0;
 
-    lcdi2c_gDescriptor = (LcdHandler_t *) devm_kzalloc(&client->dev, sizeof(LcdHandler_t), GFP_KERNEL);
+    lcdi2c_gDescriptor = (LcdDescriptor_t *) devm_kzalloc(&client->dev, sizeof(LcdDescriptor_t), GFP_KERNEL);
 
     if (!lcdi2c_gDescriptor)
         return -ENOMEM;
@@ -171,12 +173,12 @@ static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *i
 }
 
 static void lcdi2c_shutdown(struct i2c_client *client) {
-    LcdHandler_t *lcd_handler = i2c_get_clientdata(client);
+    LcdDescriptor_t *lcd_handler = i2c_get_clientdata(client);
     lcdfinalize(lcd_handler);
 }
 
 static void lcdi2c_remove(struct i2c_client *client) {
-    LcdHandler_t *lcd_handler = i2c_get_clientdata(client);
+    LcdDescriptor_t *lcd_handler = i2c_get_clientdata(client);
 
     dev_info(&client->dev, "going to be removed");
     lcdfinalize(lcd_handler);
@@ -184,7 +186,7 @@ static void lcdi2c_remove(struct i2c_client *client) {
 }
 
 static int lcdi2c_register(struct i2c_client *client) {
-    LcdHandler_t *lcd_handler = i2c_get_clientdata(client);
+    LcdDescriptor_t *lcd_handler = i2c_get_clientdata(client);
 
     if (alloc_chrdev_region(&lcd_handler->driver_data.major, 0, 1, DEVICE_NAME) < 0) {
         dev_err(&client->dev, "failed to allocate major number\n");
@@ -240,12 +242,11 @@ classError:
 
 
 static void lcdi2c_unregister(struct i2c_client *client) {
-    LcdHandler_t *lcd_handler = i2c_get_clientdata(client);
+    LcdDescriptor_t *lcd_handler = i2c_get_clientdata(client);
 
     cdev_del(&lcd_handler->driver_data.cdev);
     sysfs_remove_group(&lcd_handler->driver_data.lcdi2c_device->kobj, &i2clcd_device_attr_group);
     device_destroy(lcd_handler->driver_data.lcdi2c_class, lcd_handler->driver_data.major);
-    class_unregister(lcd_handler->driver_data.lcdi2c_class);
     class_destroy(lcd_handler->driver_data.lcdi2c_class);
     unregister_chrdev_region(lcd_handler->driver_data.major, 1);
 }
@@ -257,7 +258,6 @@ static int lcdi2c_open(struct inode *_, struct file *__) {
     }
 
     lcdi2c_gDescriptor->driver_data.open_cnt++;
-    lcdi2c_gDescriptor->driver_data.use_cnt = 0;
     try_module_get(THIS_MODULE);
     SEM_UP(lcdi2c_gDescriptor);
 
@@ -284,12 +284,7 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
         return -EBUSY;
     }
 
-    if (lcdi2c_gDescriptor->driver_data.use_cnt == (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows)) {
-        SEM_UP(lcdi2c_gDescriptor);
-        return 0;
-    }
-
-    rest = copy_to_user(buffer, lcdi2c_gDescriptor->buffer, to_copy);
+    rest = copy_to_user(buffer, lcdi2c_gDescriptor->raw_data + (u8)offset, to_copy);
 
     *offset = to_copy - rest;
     SEM_UP(lcdi2c_gDescriptor);
@@ -300,15 +295,24 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
 static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer,
                                size_t length, loff_t *offset) {
 
-    size_t to_copy = length < LCD_BUFFER_SIZE ? length : LCD_BUFFER_SIZE, rest = 0;
-
     if (SEM_DOWN(lcdi2c_gDescriptor)) {
         return -EBUSY;
     }
 
-    rest = copy_from_user(lcdi2c_gDescriptor->buffer, buffer, to_copy);
-    lcdi2c_gDescriptor->buffer[to_copy - rest] = '\0';
-    lcdprint(lcdi2c_gDescriptor, lcdi2c_gDescriptor->buffer);
+    size_t to_copy;
+    size_t rest;
+    to_copy = length < LCD_BUFFER_SIZE ? length : LCD_BUFFER_SIZE;
+    u8 *buffer_ptr = lcdi2c_gDescriptor->raw_data + (lcdi2c_gDescriptor->column + (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns));
+    u8 *buffer_end = lcdi2c_gDescriptor->raw_data + LCD_BUFFER_SIZE;
+    to_copy = buffer_end - buffer_ptr < to_copy ? buffer_end - buffer_ptr : to_copy;
+    rest = copy_from_user(buffer_ptr, buffer, to_copy);
+    lcdi2c_gDescriptor->column = (lcdi2c_gDescriptor->column + to_copy - rest) % lcdi2c_gDescriptor->organization.columns;
+    lcdi2c_gDescriptor->row = (lcdi2c_gDescriptor->row + (lcdi2c_gDescriptor->column + to_copy - rest) /
+            lcdi2c_gDescriptor->organization.columns) % lcdi2c_gDescriptor->organization.rows;
+
+    lcdsetcursor(lcdi2c_gDescriptor, lcdi2c_gDescriptor->column, lcdi2c_gDescriptor->row);
+
+    lcdflushbuffer(lcdi2c_gDescriptor);
 
     *offset = to_copy - rest;
     SEM_UP(lcdi2c_gDescriptor);
@@ -335,11 +339,20 @@ loff_t lcdi2c_lseek(struct file *file, loff_t offset, int orig) {
 
 static long lcdi2c_ioctl(struct file *file,
                          unsigned int ioctl_num,
-                         unsigned long arg) {
-
-    u8 *buffer = (u8 *) arg, ccb[10];
-    u8 buff_offset, i, ch;
+                         unsigned long __user arg) {
+    u8 buff_offset, i;
     long status = SUCCESS;
+    size_t to_copy = 0;
+    LcdCharArgs_t *char_data;
+    LcdCharArgs_t local_char;
+    LcdBoolArgs_t *bool_data;
+    LcdBoolArgs_t local_bool;
+    LcdPositionArgs_t *position_data;
+    LcdCustomCharArgs_t local_custom_char;
+    LcdCustomCharArgs_t *custom_char;
+    LcdLineArgs_t *line_data;
+    LcdBufferArgs_t *buffer_data;
+
 
     if (SEM_DOWN(lcdi2c_gDescriptor)) {
         return -EBUSY;
@@ -347,51 +360,65 @@ static long lcdi2c_ioctl(struct file *file,
 
     switch (ioctl_num) {
         case LCD_IOCTL_SETCHAR:
-            get_user(ch, buffer);
+            char_data = (LcdCharArgs_t *) arg;
+            if (copy_from_user(&local_char, char_data, sizeof(LcdCharArgs_t))) {
+                status = -EIO;
+                break;
+            }
             buff_offset = (1 + lcdi2c_gDescriptor->column + (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns)) % LCD_BUFFER_SIZE;
-            lcdwrite(lcdi2c_gDescriptor, ch);
+            lcdwrite(lcdi2c_gDescriptor, local_char.value);
             lcdi2c_gDescriptor->column = (buff_offset % lcdi2c_gDescriptor->organization.columns);
             lcdi2c_gDescriptor->row = (buff_offset / lcdi2c_gDescriptor->organization.columns);
             lcdsetcursor(lcdi2c_gDescriptor, lcdi2c_gDescriptor->column, lcdi2c_gDescriptor->row);
             break;
         case LCD_IOCTL_GETCHAR:
+            char_data = (LcdCharArgs_t *) arg;
             buff_offset = (lcdi2c_gDescriptor->column + (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns)) % LCD_BUFFER_SIZE;
-            ch = lcdi2c_gDescriptor->buffer[buff_offset];
-            put_user(ch, buffer);
+            local_char.value = lcdi2c_gDescriptor->raw_data[buff_offset];
+            if (copy_to_user(char_data, &local_char.value, sizeof(LcdCharArgs_t))) {
+                status = -EIO;
+            }
             break;
         case LCD_IOCTL_GETLINE:
+            line_data = (LcdLineArgs_t *) arg;
             buff_offset = (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns) % LCD_BUFFER_SIZE;
-            if (copy_to_user(buffer, lcdi2c_gDescriptor->buffer + buff_offset, lcdi2c_gDescriptor->organization.columns)) {
+            if (copy_to_user(&line_data->line, lcdi2c_gDescriptor->raw_data + buff_offset, lcdi2c_gDescriptor->organization.columns)) {
                 status = -EIO;
             }
             break;
         case LCD_IOCTL_SETLINE:
+            line_data = (LcdLineArgs_t *) arg;
             buff_offset = (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns) % LCD_BUFFER_SIZE;
-            if (copy_from_user(lcdi2c_gDescriptor->buffer + buff_offset, buffer, lcdi2c_gDescriptor->organization.columns)) {
+            if (copy_from_user(lcdi2c_gDescriptor->raw_data + buff_offset, line_data->line, lcdi2c_gDescriptor->organization.columns)) {
                 status = -EIO;
             } else {
                 lcdflushbuffer(lcdi2c_gDescriptor);
             }
             break;
         case LCD_IOCTL_GETBUFFER:
-            if (copy_to_user(buffer, lcdi2c_gDescriptor->buffer, LCD_BUFFER_SIZE)) {
+            buffer_data = (LcdBufferArgs_t *) arg;
+            if (copy_to_user(&buffer_data->buffer, lcdi2c_gDescriptor->raw_data, LCD_BUFFER_SIZE)) {
                 status = -EIO;
             }
+            dev_info(lcdi2c_gDescriptor->driver_data.lcdi2c_device, "Buffer: %s\n", buffer_data->buffer);
             break;
         case LCD_IOCTL_SETBUFFER:
-            if (copy_from_user(lcdi2c_gDescriptor->buffer, buffer, LCD_BUFFER_SIZE)) {
+            buffer_data = (LcdBufferArgs_t *) arg;
+            if (copy_from_user(lcdi2c_gDescriptor->raw_data, buffer_data->buffer, LCD_BUFFER_SIZE)) {
                 status = -EIO;
             } else {
                 lcdflushbuffer(lcdi2c_gDescriptor);
             }
             break;
         case LCD_IOCTL_GETPOSITION:
-            put_user(lcdi2c_gDescriptor->column, buffer);
-            put_user(lcdi2c_gDescriptor->row, buffer + 1);
+            position_data = (LcdPositionArgs_t *) arg;
+            put_user(lcdi2c_gDescriptor->column, &position_data->column);
+            put_user(lcdi2c_gDescriptor->row, &position_data->row);
             break;
         case LCD_IOCTL_SETPOSITION:
-            get_user(lcdi2c_gDescriptor->column, buffer);
-            get_user(lcdi2c_gDescriptor->row, buffer + 1);
+            position_data = (LcdPositionArgs_t *) arg;
+            get_user(lcdi2c_gDescriptor->column, &position_data->column);
+            get_user(lcdi2c_gDescriptor->row, &position_data->row);
             lcdsetcursor(lcdi2c_gDescriptor, lcdi2c_gDescriptor->column, lcdi2c_gDescriptor->row);
             break;
         case LCD_IOCTL_RESET:
@@ -401,39 +428,79 @@ static long lcdi2c_ioctl(struct file *file,
             lcdhome(lcdi2c_gDescriptor);
             break;
         case LCD_IOCTL_GETCURSOR:
-            put_user(lcdi2c_gDescriptor->cursor ? '1' : '0', buffer);
+            bool_data = (LcdBoolArgs_t *) arg;
+            local_bool.value = lcdi2c_gDescriptor->cursor ? 1 : 0;
+            if (copy_to_user(bool_data, &local_bool, sizeof(LcdBoolArgs_t))) {
+                status = -EIO;
+            }
             break;
         case LCD_IOCTL_SETCURSOR:
-            get_user(ch, buffer);
-            lcdcursor(lcdi2c_gDescriptor, (ch == '1'));
+            bool_data = (LcdBoolArgs_t *) arg;
+            if (copy_from_user(&local_bool, bool_data, sizeof(LcdBoolArgs_t))) {
+                status = -EIO;
+                break;
+            }
+            lcdcursor(lcdi2c_gDescriptor, local_bool.value == 1);
             break;
         case LCD_IOCTL_GETBLINK:
-            put_user(lcdi2c_gDescriptor->blink ? '1' : '0', buffer);
+            bool_data = (LcdBoolArgs_t *) arg;
+            local_bool.value = lcdi2c_gDescriptor->blink ? 1 : 0;
+            if (copy_to_user(bool_data, &local_bool, sizeof(LcdBoolArgs_t))) {
+                status = -EIO;
+            }
             break;
         case LCD_IOCTL_SETBLINK:
-            get_user(ch, buffer);
-            lcdblink(lcdi2c_gDescriptor, (ch == '1'));
+            bool_data = (LcdBoolArgs_t *) arg;
+            if (copy_from_user(&local_bool, bool_data, sizeof(LcdBoolArgs_t))) {
+                status = -EIO;
+                break;
+            }
+            lcdblink(lcdi2c_gDescriptor, local_bool.value == 1);
             break;
         case LCD_IOCTL_GETBACKLIGHT:
-            put_user(lcdi2c_gDescriptor->backlight ? '1' : '0', buffer);
+            bool_data = (LcdBoolArgs_t *) arg;
+            local_bool.value = lcdi2c_gDescriptor->backlight ? 1 : 0;
+            if (copy_to_user(bool_data, &local_bool, sizeof(LcdBoolArgs_t))) {
+                status = -EIO;
+            }
             break;
         case LCD_IOCTL_SETBACKLIGHT:
-            get_user(ch, buffer);
-            lcdsetbacklight(lcdi2c_gDescriptor, (ch == '1'));
+            bool_data = (LcdBoolArgs_t *) arg;
+            if (copy_from_user(&local_bool, bool_data, sizeof(LcdBoolArgs_t))) {
+                status = -EIO;
+                break;
+            }
+            lcdsetbacklight(lcdi2c_gDescriptor, local_bool.value == 1);
             break;
         case LCD_IOCTL_SCROLLHZ:
-            get_user(ch, buffer);
-            lcdscrollhoriz(lcdi2c_gDescriptor, ch - '0');
+            bool_data = (LcdBoolArgs_t *) arg;
+            if (copy_from_user(&local_bool, bool_data, sizeof(LcdBoolArgs_t))) {
+                status = -EIO;
+                break;
+            }
+            lcdscrollhoriz(lcdi2c_gDescriptor, local_bool.value == 1);
+            break;
+        case LCD_IOCTL_SCROLLVERT:
+            LcdScrollArgs_t *scroll_data = (LcdScrollArgs_t *) arg;
+            LcdScrollArgs_t local_scroll;
+            if(copy_from_user(&local_scroll, scroll_data, sizeof(LcdScrollArgs_t))) {
+                status = -EIO;
+                break;
+            }
+            lcdscrollvert(lcdi2c_gDescriptor, local_scroll.line, sizeof(local_scroll.line), local_scroll.direction);
             break;
         case LCD_IOCTL_GETCUSTOMCHAR:
-            get_user(ch, buffer);
+            custom_char = (LcdCustomCharArgs_t *) arg;
             for (i = 0; i < 8; i++)
-                put_user(lcdi2c_gDescriptor->custom_chars[ch][i], buffer + i + 1);
+                put_user(custom_char->custom_char[i], &lcdi2c_gDescriptor->custom_chars[custom_char->index][i]);
             break;
         case LCD_IOCTL_SETCUSTOMCHAR:
-            for (i = 0; i < 9; i++)
-                get_user(ccb[i], buffer + i);
-            lcdcustomchar(lcdi2c_gDescriptor, ccb[0], ccb + 1);
+            to_copy = copy_from_user(&local_custom_char, (void*) arg, sizeof(LcdCustomCharArgs_t));
+            if (to_copy) {
+                status = -EIO;
+                break;
+            }
+            lcdcustomchar(lcdi2c_gDescriptor, local_custom_char.index, local_custom_char.custom_char);
             break;
         case LCD_IOCTL_CLEAR:
             lcdclear(lcdi2c_gDescriptor);
@@ -442,6 +509,8 @@ static long lcdi2c_ioctl(struct file *file,
             dev_err(lcdi2c_gDescriptor->driver_data.lcdi2c_device, "Unknown IOCTL: 0x%02X\n", ioctl_num);
             break;
     }
+    if (status!= SUCCESS)
+        dev_err(lcdi2c_gDescriptor->driver_data.lcdi2c_device, "IOCTL failed: 0x%02X\n", ioctl_num);
     SEM_UP(lcdi2c_gDescriptor);
 
     return status;
@@ -549,7 +618,7 @@ static ssize_t lcdi2c_data(struct device *dev,
         memaddr = lcdi2c_gDescriptor->column + (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns);
         for (i = 0; i < count; i++) {
             addr = (memaddr + i) % (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows);
-            lcdi2c_gDescriptor->buffer[addr] = buf[i];
+            lcdi2c_gDescriptor->raw_data[addr] = buf[i];
         }
         lcdflushbuffer(lcdi2c_gDescriptor);
     }
@@ -568,7 +637,7 @@ static ssize_t lcdi2c_data_show(struct device *dev,
 
     if (buf) {
         for (i = 0; i < (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows); i++) {
-            buf[i] = lcdi2c_gDescriptor->buffer[i];
+            buf[i] = lcdi2c_gDescriptor->raw_data[i];
         }
     }
 
@@ -603,7 +672,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                             "       rows: %d\n"
                             "       columns: %d\n"
                             "       rows-offsets: {%s}\n"
-                            "       buffer-len: %d\n"
+                            "       raw_data-len: %d\n"
                             "       pins: {rs: %d, rw: %d, e: %d, backlight: %d,}\n"
                             "       data-lines: {4: %d, 5: %d, 6: %d, 7: %d,}\n"
                             "       busno: %d\n"
@@ -813,7 +882,7 @@ static ssize_t lcdi2c_char_show(struct device *dev,
 
     lcd_mem_addr = (lcdi2c_gDescriptor->column + (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns))
                       % LCD_BUFFER_SIZE;
-    buf[0] = lcdi2c_gDescriptor->buffer[lcd_mem_addr];
+    buf[0] = lcdi2c_gDescriptor->raw_data[lcd_mem_addr];
 
     SEM_UP(lcdi2c_gDescriptor);
     return 1;
@@ -831,13 +900,37 @@ static ssize_t lcdi2c_line_show(struct device *dev,
 
     lcd_mem_addr = (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns) % LCD_BUFFER_SIZE;
     for (int i = 0; i < lcdi2c_gDescriptor->organization.columns; i++) {
-        buf[i] = lcdi2c_gDescriptor->buffer[lcd_mem_addr + i];
+        buf[i] = lcdi2c_gDescriptor->raw_data[lcd_mem_addr + i];
         count++;
     }
 
     SEM_UP(lcdi2c_gDescriptor);
     return count;
 }
+
+static ssize_t lcdi2c_scrollvert(struct device *dev,
+                                   struct device_attribute *attr,
+                                   const char *buf, size_t count) {
+
+    if (count > 0) {
+        if (SEM_DOWN(lcdi2c_gDescriptor)) {
+            return -ERESTARTSYS;
+        }
+        dev_info(dev, "scrolling gets called %s\n", buf);
+        for (uint row = 1; row < lcdi2c_gDescriptor->organization.rows; row++) {
+            dev_info(dev, "line gets scrolled\n");
+            memcpy(lcdi2c_gDescriptor->raw_data + ((row - 1) * lcdi2c_gDescriptor->organization.columns),
+                   lcdi2c_gDescriptor->raw_data + (row * lcdi2c_gDescriptor->organization.columns),
+                   lcdi2c_gDescriptor->organization.columns);
+        }
+        memset(lcdi2c_gDescriptor->raw_data + (lcdi2c_gDescriptor->organization.rows - 1) * lcdi2c_gDescriptor->organization.columns,
+               ' ', lcdi2c_gDescriptor->organization.columns);
+        lcdflushbuffer(lcdi2c_gDescriptor);
+        SEM_UP(lcdi2c_gDescriptor);
+    }
+    return count;
+}
+
 
 module_i2c_driver(lcdi2c_driver);
 

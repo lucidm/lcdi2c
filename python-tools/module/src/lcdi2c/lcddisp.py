@@ -14,7 +14,7 @@ def scroll_vertical(lcd_print: LCDPrint):
     lcd = lcd_print.lcd
     for r in range(1, lcd.rows):
         line = lcd_print.get_line(r)
-        lcd_print.print(line, 0, r - 1)
+        lcd_print.set_line(line, r - 1)
     lcd_print.set_position(old_col, old_row - 1)
 
 
@@ -176,13 +176,15 @@ def main():
                     instr = args.print.strip()
                     arr = instr.split("\\n")
                     for r, line in enumerate(arr):
-                        if args.autoscroll and r > lcd.rows - 1:
-                            row = lcd.rows - 1
-                            scroll_vertical(f)
+                        if args.autoscroll:
+                            if r >= lcd.rows:
+                                f.scroll_vert(line[0:lcd.columns], False)
+                                row = lcd.rows - 1
+                            else:
+                                row = r
                         else:
-                            row = r
-                        trimmed_to = lcd.columns - (0 if args.wrap else f.position.column)
-                        f.print(line[:trimmed_to], 0, row)
+                            row = r % lcd.rows
+                        f.print(line[0:lcd.columns], 0, row)
 
                 if args.get_position:
                     print(f"{f.position.column} {f.position.row}")

@@ -46,21 +46,22 @@
 #define IOCTLC (2)  //Single character argument
 #define LCD_IOCTL_GETCHAR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x01 << 2), u8)
 #define LCD_IOCTL_SETCHAR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x02 << 2), u8)
-#define LCD_IOCTL_GETLINE _IOR(LCD_IOCTL_BASE, IOCTLB | (0x03 << 2), LcdLineLength_t)
-#define LCD_IOCTL_SETLINE _IOW(LCD_IOCTL_BASE, IOCTLB | (0x04 << 2), LcdLineLength_t)
+#define LCD_IOCTL_GETLINE _IOR(LCD_IOCTL_BASE, IOCTLB | (0x03 << 2), LcdLineArgs_t)
+#define LCD_IOCTL_SETLINE _IOW(LCD_IOCTL_BASE, IOCTLB | (0x04 << 2), LcdLineArgs_t)
 #define LCD_IOCTL_GETBUFFER _IOR(LCD_IOCTL_BASE, IOCTLB | (0x05 << 2), LcdBuffer_t)
 #define LCD_IOCTL_SETBUFFER _IOW(LCD_IOCTL_BASE, IOCTLB | (0x06 << 2), LcdBuffer_t)
-#define LCD_IOCTL_GETPOSITION _IOR(LCD_IOCTL_BASE, IOCTLB | (0x07 << 2), LcdPosition_t)
-#define LCD_IOCTL_SETPOSITION _IOW(LCD_IOCTL_BASE, IOCTLB | (0x08 << 2), LcdPosition_t)
-#define LCD_IOCTL_GETBACKLIGHT _IOR(LCD_IOCTL_BASE, IOCTLC | (0x09 <<2), u8)
-#define LCD_IOCTL_SETBACKLIGHT _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0A << 2), u8)
-#define LCD_IOCTL_GETCURSOR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x0B << 2), u8)
-#define LCD_IOCTL_SETCURSOR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0C<< 2), u8)
-#define LCD_IOCTL_GETBLINK _IOR(LCD_IOCTL_BASE, IOCTLC | (0x0D << 2), u8)
-#define LCD_IOCTL_SETBLINK _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0E << 2), u8)
-#define LCD_IOCTL_GETCUSTOMCHAR _IOR(LCD_IOCTL_BASE, IOCTLB | (0x0F << 2), CustomChar_t)
-#define LCD_IOCTL_SETCUSTOMCHAR _IOW(LCD_IOCTL_BASE, IOCTLB | (0x10 << 2), CustomChar_t)
-#define LCD_IOCTL_SCROLLHZ _IOW(LCD_IOCTL_BASE, IOCTLC | (0x12 << 2), u8)
+#define LCD_IOCTL_GETPOSITION _IOR(LCD_IOCTL_BASE, IOCTLB | (0x07 << 2), LcdPositionArgs_t)
+#define LCD_IOCTL_SETPOSITION _IOW(LCD_IOCTL_BASE, IOCTLB | (0x08 << 2), LcdPositionArgs_t)
+#define LCD_IOCTL_GETBACKLIGHT _IOR(LCD_IOCTL_BASE, IOCTLC | (0x09 <<2), LcdBoolArgs_t)
+#define LCD_IOCTL_SETBACKLIGHT _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0A << 2), LcdBoolArgs_t)
+#define LCD_IOCTL_GETCURSOR _IOR(LCD_IOCTL_BASE, IOCTLC | (0x0B << 2), LcdBoolArgs_t)
+#define LCD_IOCTL_SETCURSOR _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0C<< 2), LcdBoolArgs_t)
+#define LCD_IOCTL_GETBLINK _IOR(LCD_IOCTL_BASE, IOCTLC | (0x0D << 2), LcdBoolArgs_t)
+#define LCD_IOCTL_SETBLINK _IOW(LCD_IOCTL_BASE, IOCTLC | (0x0E << 2), LcdBoolArgs_t)
+#define LCD_IOCTL_GETCUSTOMCHAR _IOWR(LCD_IOCTL_BASE, IOCTLB | (0x0F << 2), LcdCustomCharArgs_t)
+#define LCD_IOCTL_SETCUSTOMCHAR _IOW(LCD_IOCTL_BASE, IOCTLB | (0x10 << 2), LcdCustomCharArgs_t)
+#define LCD_IOCTL_SCROLLHZ _IOW(LCD_IOCTL_BASE, IOCTLC | (0x11 << 2), u8)
+#define LCD_IOCTL_SCROLLVERT _IOW(LCD_IOCTL_BASE, IOCTLC | (0x12 << 2), LcdScrollArgs_t)
 #define LCD_IOCTL_CLEAR _IO(LCD_IOCTL_BASE, IOCTLC | (0x13 << 2))
 #define LCD_IOCTL_RESET _IO(LCD_IOCTL_BASE, IOCTLC | (0x14 << 2))
 #define LCD_IOCTL_HOME  _IO(LCD_IOCTL_BASE, IOCTLC | (0x15 << 2))
@@ -100,6 +101,7 @@ static ssize_t lcdi2c_blink(struct device *dev, struct device_attribute *attr, c
 static ssize_t lcdi2c_home(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 static ssize_t lcdi2c_clear(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 static ssize_t lcdi2c_scrollhz(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
+static ssize_t lcdi2c_scrollvert(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 static ssize_t lcdi2c_customchar_show(struct device *dev, struct device_attribute *attr, char *buf);
 static ssize_t lcdi2c_customchar(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 static ssize_t lcdi2c_char_show(struct device *dev, struct device_attribute *attr, char *buf);
@@ -116,6 +118,7 @@ DEVICE_ATTR(blink, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_blink
 DEVICE_ATTR(home, S_IWUSR | S_IWGRP, NULL, lcdi2c_home);
 DEVICE_ATTR(clear, S_IWUSR | S_IWGRP, NULL, lcdi2c_clear);
 DEVICE_ATTR(scrollhz, S_IWUSR | S_IWGRP, NULL, lcdi2c_scrollhz);
+DEVICE_ATTR(scrollvert, S_IWUSR | S_IWGRP, NULL, lcdi2c_scrollvert);
 DEVICE_ATTR(customchar, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_customchar_show, lcdi2c_customchar);
 DEVICE_ATTR(character, S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_char_show, lcdi2c_char);
 DEVICE_ATTR(line, S_IRUSR | S_IRGRP | S_IROTH, lcdi2c_line_show, NULL);
@@ -131,6 +134,7 @@ static const struct attribute *i2clcd_attrs[] = {
         &dev_attr_home.attr,
         &dev_attr_clear.attr,
         &dev_attr_scrollhz.attr,
+        &dev_attr_scrollvert.attr,
         &dev_attr_customchar.attr,
         &dev_attr_character.attr,
         &dev_attr_line.attr,

@@ -37,8 +37,8 @@ extern uint pinout[8];
 #define LCD_CMD_SETDDRAMADDR    (7)
 
 #define DEFAULT_CHIP_ADDRESS (0x27)
-#define LCD_BUFFER_SIZE (0x68)   //20 columns * 4 rows + 4 extra chars
-#define LCD_MAX_LINE_LENGTH (40) //Maximum line lenght in characters (usually less than 40)
+#define LCD_BUFFER_SIZE (20 * 4 + 4)   //20 columns * 4 rows + 4 extra chars
+#define LCD_MAX_LINE_LENGTH (40)       //Maximum line length in characters (usually less than 40)
 #define LCD_DEFAULT_COLS (16)
 #define LCD_DEFAULT_ROWS (2)
 #define LCD_DEFAULT_ORGANIZATION LCD_TOPO_16x2
@@ -156,23 +156,54 @@ typedef struct lcd_organization
 
 typedef struct lcdi2c_driver
 {
+    int minor;
+    int major;
+    int use_cnt;
+    int open_cnt;
     struct i2c_client *client;
     struct class *lcdi2c_class;
     struct device *lcdi2c_device;
     struct cdev cdev;
     struct semaphore sem;
-    int minor;
-    int major;
-    int use_cnt;
-    int open_cnt;
 } Lcdi2cDriver_t;
 
 typedef u8 LcdBuffer_t[LCD_BUFFER_SIZE];
 typedef u8 CustomChar_t[8];
-typedef u8 LcdLineLength_t[LCD_MAX_LINE_LENGTH];
-typedef u8 LcdPosition_t[2];
+typedef u8 LcdLine_t[LCD_MAX_LINE_LENGTH];
 
-typedef struct lcddata
+typedef struct LcdBufferArgs_t {
+    LcdBuffer_t buffer;
+} LcdBufferArgs_t;
+
+typedef struct LcdBoolArgs_t {
+    u8 value;
+} LcdBoolArgs_t;
+
+typedef struct LcdCharArgs_t {
+    u8 value;
+} LcdCharArgs_t;
+
+typedef struct LcdLineArgs_t {
+    LcdLine_t line;
+} LcdLineArgs_t;
+
+typedef struct LcdPositionArgs_t {
+    u8 column;
+    u8 row;
+} LcdPositionArgs_t;
+
+typedef struct LcdScrollArgs_t {
+    u32 direction;
+    LcdLine_t line;
+} LcdScrollArgs_t;
+
+typedef struct LcdCustomCharArgs_t {
+    u8 index;
+    CustomChar_t custom_char;
+} LcdCustomCharArgs_t;
+
+
+typedef struct LcdDescriptor_t
 {
     Lcdi2cDriver_t driver_data;
     LcdOrganization_t organization;
@@ -185,27 +216,27 @@ typedef struct lcddata
     u8 display_control;
     u8 display_function;
     u8 show_welcome_screen;
-    LcdBuffer_t buffer;
+    LcdBuffer_t raw_data;
     CustomChar_t custom_chars[8];
     char welcome[16];
-} LcdHandler_t;
+} LcdDescriptor_t;
 
 void _udelay_(u32 usecs);
-void lcdflushbuffer(LcdHandler_t *lcd);
-void lcdcommand(LcdHandler_t *lcd, u8 data);
-void lcdwrite(LcdHandler_t *lcd, u8 data);
-void lcdsetcursor(LcdHandler_t *lcd, u8 column, u8 row);
-void lcdsetbacklight(LcdHandler_t *lcd, u8 backlight);
-void lcdcursor(LcdHandler_t *lcd, u8 cursor);
-void lcdblink(LcdHandler_t *lcd, u8 blink);
-u8 lcdprint(LcdHandler_t *lcd, const char *data);
-void lcdfinalize(LcdHandler_t *lcd);
-void lcdinit(LcdHandler_t *lcd, lcd_topology_t topo);
-void lcdhome(LcdHandler_t *lcd);
-void lcdclear(LcdHandler_t *lcd);
-void lcdscrollvert(LcdHandler_t *lcd, u8 direction);
-void lcdscrollhoriz(LcdHandler_t *lcd, u8 direction);
-void lcdcustomchar(LcdHandler_t *lcd, u8 num, const u8 *bitmap);
-u8 lcdsendbuffer(LcdHandler_t *lcd, const char *data, u8 len);
+void lcdflushbuffer(LcdDescriptor_t *lcd);
+void lcdcommand(LcdDescriptor_t *lcd, u8 data);
+void lcdwrite(LcdDescriptor_t *lcd, u8 data);
+void lcdsetcursor(LcdDescriptor_t *lcd, u8 column, u8 row);
+void lcdsetbacklight(LcdDescriptor_t *lcd, u8 backlight);
+void lcdcursor(LcdDescriptor_t *lcd, u8 cursor);
+void lcdblink(LcdDescriptor_t *lcd, u8 blink);
+u8 lcdprint(LcdDescriptor_t *lcd, const char *data);
+void lcdfinalize(LcdDescriptor_t *lcd);
+void lcdinit(LcdDescriptor_t *lcd, lcd_topology_t topo);
+void lcdhome(LcdDescriptor_t *lcd);
+void lcdclear(LcdDescriptor_t *lcd);
+void lcdscrollvert(LcdDescriptor_t *lcd, const char *line, uint len, u8 direction);
+void lcdscrollhoriz(LcdDescriptor_t *lcd, u8 direction);
+void lcdcustomchar(LcdDescriptor_t *lcd, u8 num, const u8 *bitmap);
+u8 lcdsendbuffer(LcdDescriptor_t *lcd, const char *data, u8 len);
 
 #endif //LCDI2C_LCDLIB_H

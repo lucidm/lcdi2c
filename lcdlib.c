@@ -25,7 +25,7 @@ void _udelay_(u32 usecs) {
  * @return none
  *
  */
-static void _buswrite(LcdHandler_t *lcd, u8 data) {
+static void _buswrite(LcdDescriptor_t *lcd, u8 data) {
     data |= lcd->backlight ? (1 << PIN_BACKLIGHT) : 0;
     LOWLEVEL_WRITE(lcd->driver_data.client, data);
 }
@@ -38,7 +38,7 @@ static void _buswrite(LcdHandler_t *lcd, u8 data) {
  * @return none
  *
  */
-static void _strobe(LcdHandler_t *lcd, u8 data) {
+static void _strobe(LcdDescriptor_t *lcd, u8 data) {
     _buswrite(lcd, data | (1 << PIN_EN));
     USLEEP(1);
     _buswrite(lcd, data & (~(1 << PIN_EN)));
@@ -53,7 +53,7 @@ static void _strobe(LcdHandler_t *lcd, u8 data) {
  * @return none
  *
  */
-static void _write4bits(LcdHandler_t *lcd, u8 value) {
+static void _write4bits(LcdDescriptor_t *lcd, u8 value) {
     _buswrite(lcd, value);
     _strobe(lcd, value);
 }
@@ -68,7 +68,7 @@ static void _write4bits(LcdHandler_t *lcd, u8 value) {
  * @return none
  *
  */
-static void lcdsend(LcdHandler_t *lcd, u8 value, u8 mode) {
+static void lcdsend(LcdDescriptor_t *lcd, u8 value, u8 mode) {
     u8 highnib = value & 0xF0;
     u8 lownib = value << 4;
 
@@ -77,18 +77,18 @@ static void lcdsend(LcdHandler_t *lcd, u8 value, u8 mode) {
 }
 
 /**
- * copy buffer of buffer from host to LCD
+ * copy raw_data of raw_data from host to LCD
  *
  * @param LcdData_t* lcd handler structure address
  * @return none
  *
  */
-void lcdflushbuffer(LcdHandler_t *lcd) {
+void lcdflushbuffer(LcdDescriptor_t *lcd) {
     u8 col = lcd->column, row = lcd->row;
 
     for (u8 i = 0; i < (lcd->organization.columns * lcd->organization.rows); i++) {
         lcdcommand(lcd, LCD_DDRAM_SET + ITOMEMADDR(lcd, i));
-        lcdsend(lcd, lcd->buffer[i], (1 << PIN_RS));
+        lcdsend(lcd, lcd->raw_data[i], (1 << PIN_RS));
     }
     lcdsetcursor(lcd, col, row);
 }
@@ -101,7 +101,7 @@ void lcdflushbuffer(LcdHandler_t *lcd) {
  * @return none
  *
  */
-void lcdcommand(LcdHandler_t *lcd, u8 data) {
+void lcdcommand(LcdDescriptor_t *lcd, u8 data) {
     lcdsend(lcd, data, 0);
 }
 
@@ -113,11 +113,11 @@ void lcdcommand(LcdHandler_t *lcd, u8 data) {
  * @return none
  *
  */
-void lcdwrite(LcdHandler_t *lcd, u8 data) {
+void lcdwrite(LcdDescriptor_t *lcd, u8 data) {
     u8 memaddr;
 
     memaddr = (lcd->column + (lcd->row * lcd->organization.columns)) % LCD_BUFFER_SIZE;
-    lcd->buffer[memaddr] = data;
+    lcd->raw_data[memaddr] = data;
 
     lcdsend(lcd, data, (1 << PIN_RS));
 }
@@ -134,7 +134,7 @@ void lcdwrite(LcdHandler_t *lcd, u8 data) {
  * @return none
  *
  */
-void lcdsetcursor(LcdHandler_t *lcd, u8 column, u8 row) {
+void lcdsetcursor(LcdDescriptor_t *lcd, u8 column, u8 row) {
     lcd->column = (column >= lcd->organization.columns ? 0 : column);
     lcd->row = (row >= lcd->organization.rows ? 0 : row);
     lcdcommand(lcd, LCD_DDRAM_SET | PTOMEMADDR(lcd, lcd->column, lcd->row));
@@ -149,7 +149,7 @@ void lcdsetcursor(LcdHandler_t *lcd, u8 column, u8 row) {
  * @return none
  *
  */
-void lcdsetbacklight(LcdHandler_t *lcd, u8 backlight) {
+void lcdsetbacklight(LcdDescriptor_t *lcd, u8 backlight) {
     lcd->backlight = backlight;
     _buswrite(lcd, lcd->backlight ? (1 << PIN_BACKLIGHT) : 0);
 }
@@ -162,7 +162,7 @@ void lcdsetbacklight(LcdHandler_t *lcd, u8 backlight) {
  * @return none
  *
  */
-void lcdcursor(LcdHandler_t *lcd, u8 cursor) {
+void lcdcursor(LcdDescriptor_t *lcd, u8 cursor) {
     if (cursor)
         lcd->display_control |= LCD_CURSOR;
     else
@@ -179,7 +179,7 @@ void lcdcursor(LcdHandler_t *lcd, u8 cursor) {
  * @return none
  *
  */
-void lcdblink(LcdHandler_t *lcd, u8 blink) {
+void lcdblink(LcdDescriptor_t *lcd, u8 blink) {
     if (blink)
         lcd->display_control |= LCD_BLINK;
     else
@@ -195,7 +195,7 @@ void lcdblink(LcdHandler_t *lcd, u8 blink) {
  * @return none
  *
  */
-void lcdhome(LcdHandler_t *lcd) {
+void lcdhome(LcdDescriptor_t *lcd) {
     lcd->column = 0;
     lcd->row = 0;
     lcdcommand(lcd, LCD_HOME);
@@ -203,15 +203,15 @@ void lcdhome(LcdHandler_t *lcd) {
 }
 
 /**
- * clears buffer by setting all bytes to 0x20 (ASCII code for space) and
+ * clears raw_data by setting all bytes to 0x20 (ASCII code for space) and
  * send clear command to a LCD
  *
  * @param LcdData_t* lcd handler structure address
  * @return none
  *
  */
-void lcdclear(LcdHandler_t *lcd) {
-    memset(lcd->buffer, 0x20, LCD_BUFFER_SIZE); //Fill buffer with spaces
+void lcdclear(LcdDescriptor_t *lcd) {
+    memset(lcd->raw_data, 0x20, LCD_BUFFER_SIZE); //Fill raw_data with spaces
     lcdcommand(lcd, LCD_CLEAR);
     MSLEEP(2);
 }
@@ -219,26 +219,39 @@ void lcdclear(LcdHandler_t *lcd) {
 /**
  * scrolls content of a LCD horizontally. This is internal feature of HD44780
  * it scrolls content without actually changing content of internal RAM, so
- * buffer of host stays intact as well
+ * raw_data of host stays intact as well
  *
  * @param LcdData_t* lcd handler structure address
  * @param u8 direction of a scroll, true - right, false - left
  * @return none
  *
  */
-void lcdscrollhoriz(LcdHandler_t *lcd, u8 direction) {
+void lcdscrollhoriz(LcdDescriptor_t *lcd, u8 direction) {
     lcdcommand(lcd, LCD_DS_SHIFTDISPLAY |
                     (direction ? LCD_DS_SHIFTRIGHT : LCD_DS_SHIFTLEFT));
 }
 
 /**
- * TODO - not implemented yet
  *
  * @param LcdData_t* lcd handler structure address
+ * @param u8 direction of a scroll, true - down, false - up
  *
  */
-void lcdscrollvert(LcdHandler_t *lcd, u8 direction) {
-    //TODO: Vertical scroll
+void lcdscrollvert(LcdDescriptor_t *lcd, const char *line, uint len, u8 direction) {
+    if (direction) {
+        memcpy(lcd->raw_data + lcd->organization.columns,
+               lcd->raw_data,
+               lcd->organization.columns * (lcd->organization.rows - 1));
+        memcpy(lcd->raw_data, line, lcd->organization.columns);
+    } else {
+        for (uint row = 1; row < lcd->organization.rows; row++) {
+            memcpy(lcd->raw_data + (row - 1) * lcd->organization.columns,
+                   lcd->raw_data + row * lcd->organization.columns,
+                   lcd->organization.columns);
+        }
+        memcpy(lcd->raw_data + (lcd->organization.rows - 1) * lcd->organization.columns, line, len);
+    }
+    lcdflushbuffer(lcd);
 }
 
 /**
@@ -255,7 +268,7 @@ void lcdscrollvert(LcdHandler_t *lcd, u8 direction) {
  * @return u8 bytes written
  *
  */
-u8 lcdprint(LcdHandler_t *lcd, const char *data) {
+u8 lcdprint(LcdDescriptor_t *lcd, const char *data) {
     int i = 0;
     const int max_len = (lcd->organization.columns * lcd->organization.rows);
 
@@ -296,7 +309,7 @@ u8 lcdprint(LcdHandler_t *lcd, const char *data) {
  * @return none
  *
  */
-void lcdcustomchar(LcdHandler_t *lcd, u8 num, const u8 *bitmap) {
+void lcdcustomchar(LcdDescriptor_t *lcd, u8 num, const u8 *bitmap) {
     u8 i;
 
     num &= 0x07;
@@ -315,7 +328,7 @@ void lcdcustomchar(LcdHandler_t *lcd, u8 num, const u8 *bitmap) {
  * @return none
  *
  */
-void lcdfinalize(LcdHandler_t *lcd) {
+void lcdfinalize(LcdDescriptor_t *lcd) {
     lcdsetbacklight(lcd, 0);
     lcdclear(lcd);
     lcdcommand(lcd, LCD_DC_DISPLAYOFF | LCD_DC_CURSOROFF | LCD_DC_CURSORBLINKOFF);
@@ -329,8 +342,8 @@ void lcdfinalize(LcdHandler_t *lcd) {
  * @return none
  *
  */
-void lcdinit(LcdHandler_t *lcd, lcd_topology_t topo) {
-    memset(lcd->buffer, 0x20, LCD_BUFFER_SIZE); //Fill buffer with spaces
+void lcdinit(LcdDescriptor_t *lcd, lcd_topology_t topo) {
+    memset(lcd->raw_data, 0x20, LCD_BUFFER_SIZE); //Fill raw_data with spaces
 
     if (topo > LCD_TOPO_8x2)
         topo = LCD_TOPO_16x2;
