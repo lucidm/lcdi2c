@@ -2,9 +2,9 @@
 
 ########################################################################################################################
 #
-#   AlphaLCD - Python library for Alphanumeric LCD displays with I2C hat
+#   AlphaLCD - Python library for Alphanumeric LCD with I2C hat
 #   Author: Jarek Zok <jarek.zok at gmail.com>
-#   Version: 1.x
+#   Version: 0.2.x
 #   Date: 2024-01-14
 #   License: GPL3
 #
@@ -407,7 +407,7 @@ class AlphaLCD:
         return self.ioctl_manager(ioctl_name, self.file, **kwargs)
 
     def __enter__(self):
-        self.open(file=self.device_path, mode=self.mode)
+        self.open()
         return self
 
     def __exit__(self, type, value, traceback):
@@ -701,7 +701,7 @@ class LCDPrint:
 
 
 if __name__ == "__main__":
-    # Example usage
+    # Example usage for 16x4 module
     lcd = AlphaLCD()
     with LCDPrint(lcd) as f:
         try:
@@ -728,10 +728,11 @@ if __name__ == "__main__":
             f.set_position(2, 1)
             print(f"LINE 1: {f.get_line(1)}")
             print(f"CURSOR: {f.get_position()}")
-            for i in range(50):
-                f.scroll_vert(f"Line {i}", True)
-            for i in range(50):
-                f.scroll_vert(f"Line {i}", False)
+            while(1):
+                for i in range(50):
+                    f.scroll_vert(f"Line {i}", True)
+                for i in range(50):
+                    f.scroll_vert(f"Line {i}", False)
         except Exception as e:
             print(e)
 
