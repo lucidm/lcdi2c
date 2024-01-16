@@ -284,7 +284,7 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
         return -EBUSY;
     }
 
-    rest = copy_to_user(buffer, lcdi2c_gDescriptor->raw_data + (u8)offset, to_copy);
+    rest = copy_to_user(buffer, lcdi2c_gDescriptor->raw_data, to_copy);
 
     *offset = to_copy - rest;
     SEM_UP(lcdi2c_gDescriptor);
@@ -294,16 +294,17 @@ static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer,
 
 static ssize_t lcdi2c_fopwrite(struct file *file, const char __user *buffer,
                                size_t length, loff_t *offset) {
+    size_t to_copy;
+    size_t rest;
+    u8 *buffer_ptr, *buffer_end;
 
     if (SEM_DOWN(lcdi2c_gDescriptor)) {
         return -EBUSY;
     }
 
-    size_t to_copy;
-    size_t rest;
     to_copy = length < LCD_BUFFER_SIZE ? length : LCD_BUFFER_SIZE;
-    u8 *buffer_ptr = lcdi2c_gDescriptor->raw_data + (lcdi2c_gDescriptor->column + (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns));
-    u8 *buffer_end = lcdi2c_gDescriptor->raw_data + LCD_BUFFER_SIZE;
+    buffer_ptr = lcdi2c_gDescriptor->raw_data + (lcdi2c_gDescriptor->column + (lcdi2c_gDescriptor->row * lcdi2c_gDescriptor->organization.columns));
+    buffer_end = lcdi2c_gDescriptor->raw_data + LCD_BUFFER_SIZE;
     to_copy = buffer_end - buffer_ptr < to_copy ? buffer_end - buffer_ptr : to_copy;
     rest = copy_from_user(buffer_ptr, buffer, to_copy);
     lcdi2c_gDescriptor->column = (lcdi2c_gDescriptor->column + to_copy - rest) % lcdi2c_gDescriptor->organization.columns;
@@ -400,7 +401,6 @@ static long lcdi2c_ioctl(struct file *file,
             if (copy_to_user(&buffer_data->buffer, lcdi2c_gDescriptor->raw_data, LCD_BUFFER_SIZE)) {
                 status = -EIO;
             }
-            dev_info(lcdi2c_gDescriptor->driver_data.lcdi2c_device, "Buffer: %s\n", buffer_data->buffer);
             break;
         case LCD_IOCTL_SETBUFFER:
             buffer_data = (LcdBufferArgs_t *) arg;
@@ -918,9 +918,7 @@ static ssize_t lcdi2c_scrollvert(struct device *dev,
         if (SEM_DOWN(lcdi2c_gDescriptor)) {
             return -ERESTARTSYS;
         }
-        dev_info(dev, "scrolling gets called %s\n", buf);
         for (uint row = 1; row < lcdi2c_gDescriptor->organization.rows; row++) {
-            dev_info(dev, "line gets scrolled\n");
             memcpy(lcdi2c_gDescriptor->raw_data + ((row - 1) * lcdi2c_gDescriptor->organization.columns),
                    lcdi2c_gDescriptor->raw_data + (row * lcdi2c_gDescriptor->organization.columns),
                    lcdi2c_gDescriptor->organization.columns);
