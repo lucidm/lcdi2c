@@ -12,11 +12,13 @@
 
 import array
 import fcntl
+import sys
+
 import yaml
 
 from ctypes import c_char, c_bool, c_uint8, c_uint32, Structure
 from enum import Enum
-from typing import Tuple, Iterable
+from typing import Tuple, Iterable, ByteString
 
 META_FILE_PATH = "/sys/class/alphalcd/lcdi2c/meta"
 
@@ -594,7 +596,6 @@ class LCDPrint:
         """
         self.lcd(LCDCommand.SCROLL_VERT.value, line=line, direction=1 if direction else 0)
 
-
     @property
     def backlight(self) -> bool:
         """
@@ -676,6 +677,14 @@ class LCDPrint:
             raise ValueError("Custom character data must be 8 bytes long")
         self.lcd(LCDCommand.SET_CUSTOMCHAR.value, index=char, data=data)
 
+    def set_custom_char(self, data: CustomChar) -> None:
+        """
+        Set the custom character data.
+        :param data: CustomChar instance
+        :return:
+        """
+        self.set_custom_char_bin(data.index, data.to_bitmap())
+
     def get_buffer(self) -> str:
         """
         Get the whole LCD raw_data and return it as a string.
@@ -701,6 +710,7 @@ class LCDPrint:
 
 
 if __name__ == "__main__":
+    import time
     # Example usage for 16x4 module
     lcd = AlphaLCD()
     with LCDPrint(lcd) as f:
@@ -711,7 +721,16 @@ if __name__ == "__main__":
             f.cursor = True
             f.blink = True
 
-            f.print("0123456789ABCDEFGHIJ", 0, 0)
+            f.set_custom_char_bin(0, [
+                0b00100,
+                0b01110,
+                0b11111,
+                0b11111,
+                0b01110,
+                0b00100,
+                0b00000,
+                0b00000])
+            f.print("\x000123456789ABCDEFGHIJ", 0, 0)
             print(f"LINE 0:\"{f.get_line(0)}\"")
             f.set_line("FEEDFACEDEADBEEF", 1)
 
@@ -720,7 +739,7 @@ if __name__ == "__main__":
             print(f"LINE 1:\"{f.get_line(1)}\"")
             print(f"CURSOR: {f.get_position()}")
             print(f"Buffer:\n\t\"{f.get_buffer()}\"")
-
+            time.sleep(2)
             f.clear()
             f.set_buffer("~~~~~~~~~~~~~~~~fedcba9876543210----------------****************")
             print(f"Buffer:\n\t\"{f.get_buffer()}\"")
@@ -728,7 +747,8 @@ if __name__ == "__main__":
             f.set_position(2, 1)
             print(f"LINE 1: {f.get_line(1)}")
             print(f"CURSOR: {f.get_position()}")
-            while(1):
+            time.sleep(2)
+            while 1:
                 for i in range(50):
                     f.scroll_vert(f"Line {i}", True)
                 for i in range(50):

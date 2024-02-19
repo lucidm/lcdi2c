@@ -4,10 +4,37 @@ Prior to compilation, make sure you have linux-headers package installed.
 For RaspberryPi with Debian-based distro run ```sudo apt install linux-headers-rpi``` to install required package.
 Or ```sudo apt install linux-headers-$(uname -r)``` for other Debian-based distros.
 
-requirements
+This version is using Device Tree overlay to load the module on boot.
+In order to install device tree overlay for LCD module, you need to have device tree compiler installed:
+```bash
+sudo apt install device-tree-compiler
+```
+
+
+Requirements
 ------------
 * Running Linux Kernel and its source code. Version 3.x or higher is supported.
 * Prepared Kernel source for modules compilation.
+
+
+Compile the module and install on running kernel:
+```bash
+make CONFIG_LCDI2C=m
+sudo make CONFIG_LCDI2C=m install
+````
+
+Compile the overlay and install it:
+```bash
+make CONFIG_LCDI2C=m dtbo
+sudo cp lcdi2c-overlay.dtbo /boot/overlays/
+sudo nano /boot/config.txt
+```
+Add the following line to the end of the file:
+```bash
+dtoverlay=lcdi2c-overlay
+```
+Save the file and reboot the system, from this point on, LCD module will be loaded automatically on boot.
+
 
 compilation
 -----------
@@ -25,10 +52,9 @@ compilation
     * ```sudo make install```
 
 * Finally, load the module:
-    * ```sudo insmod /lib/modules/$(uname -r)/extra/lcdi2c.ko topo=2 busno=1 swscreen=1```
-    * or using modprobe:
-      ```sudo modprobe lcdi2c topo=2 busno=1 swscreen=1```
-    where **topo** is LCD topology, **busno** is I2C bus number and **swscreen** is switch for welcome screen (1 - on/ 0 - off)
+    * ```sudo modprobe lcdi2c topo=2 swscreen=0```
+    where **topo** is LCD topology, **swscreen** is switch for welcome screen (1 - on/ 0 - off)
+    * bus number and expander address comes from overlay configuration, if you'd like to change it, you can change the bus number in lcdi2c.dts file.
  
 * Run the example:
      * ```./examples/lcddev.py```
@@ -39,8 +65,6 @@ module arguments
   with default ones, which may, or may not be suitable for your particular configuration. Running 
   ```modinfo lcdi2c.ko``` will give you information about module expected arguments. Here's the list:
   
-* **busno**  - bus number, same as in proof application.
-
 * **address** - I2C expander address, default set to 0x27
 
 * **pinout** - array of number of pins configuration. Not all expanders are configured the same, so you
@@ -63,6 +87,8 @@ module arguments
            You can later read the number form /sys filesystem.
            
 * **topo**   - LCD topology, same as described in "testing" section. Default set to 4 (16x2).
+* **swscreen** - switch for welcome screen, 1 - on, 0 - off. Default set to 1
+
 
 /sys device interface
 ----------------
@@ -110,7 +136,8 @@ module arguments
   - **home**      - writing "1" will cause LCD to move cursor to first column and row of LCD.
   
   - **meta**      - description of currently used LCD. Read-only file in YAML format. This file contains information about
-                currently used LCD, its topology, size, driver version, used bus, device address, etc. Please take a look at the python example which use this interface to get information about the display.
+                    LCD topology, addresses, IOCTLs supported by the driver, etc and are used to generalize the interface for higher level API.
+                
   
   - **position**  - this file will help you to set or read current cursor position. This file contains two bytes,
 	        value of first byte informs about current cursor position at column, second byte contain information
@@ -134,37 +161,29 @@ module arguments
   function to read data from device. Below is a list of supported IOCTL commands:
   
   - **CLEAR** - writing "1" as argument of this ioctl, will clear the display
-  
   - **HOME**  - writing "1" as argument of this ioctl, will move cursor to first column and row of the display
-  
   - **RESET** - writing "1" will reset LCD to default state
-  
   - **GETCHAR** - this ioctl will return ASCII value of current character (character cursor is hovering at)
-  
   - **SETCHAR** - this ioctl will set given ASCII character at position pointed by current cursor setting
-  
+  - **GETLINE** - gets text from current row of the display
+  - **SETLINE** - sets text of current row of the display
+  - **GETBUFFER** - gets whole buffer of the display, no special characters are interpreted, the lines ends according to LCD topology specification (for 16x2 LCD 16th character will be the last character from first line, 17th - first character from the second line, etc.). 
+  - **SETBUFFER** - sets whole buffer of the display, it's up to host to provide correct formatting of the text, lines end marking is according to LCD topology specification.
   - **GETPOSITION** - will return current cursor position as two bytes, value of first byte represents current column, second one - current row
-  
   - **SETPOSITION** - writing two bytes to this ioctl will set current cursor position on the display
-  
   - **GETBACKLIGHT** - will return "0" if backlight is currently switched off, "1" otherwise
-  
   - **SETBACKLIGHT** - "1" written to this ioctl will switch backlight on or if "0" is written, will switch it off
-  
   - **GETCURSOR** - returns current cursor visibility status, "0" - invisible, "1" - visible
-  
   - **SETCURSOR** - sets cursor visibility, "0" - invisible, "1" - visible
-  
   - **GETBLINK** - returns blinking cursor status, "0" - cursors is not blinking, "1" - cursor is blinking
-  
   - **SETBLINK** - sets or resets cursor blink, "0" - cursor will blink, "1" - cursor will not blink
-  
   - **SCROLLHZ** - wrtting "0" to this ioctl will scroll screen to the left by one column, "1" - will scroll to the right
-  
+  - **SCROLLVERT** - writing "0" to this ioctl will scroll screen up by one row, "1" - will scroll down, the last or the first one row will be set empty after this operation  
   - **SETCUSTOMCHAR** - allows to define new character map for given character number. This ioctl expects 9 bytes of data exactly, first byte is character number
-                  eight subsequent bytes defines actual bitmap of font. This control differs from "customchar" in a way, that you cannot send more than
-                  one character definition at once. If you want to define more than one character, just call this ioctl multiple times for each character
-                  you would like to define.
+                 eight subsequent bytes defines actual bitmap of font. This control differs from "customchar" in a way, that you cannot send more than
+                 one character definition at once. If you want to define more than one character, just call this ioctl multiple times for each character
+                 you would like to define.
+  - **GETCUSTOMCHAR** - Gets custom char bitmap definition, first byte marks the character number, for which you'd like to get bitmap definition from.
                   
 media
 -----

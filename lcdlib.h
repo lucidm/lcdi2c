@@ -237,6 +237,5 @@ void lcdclear(LcdDescriptor_t *lcd);
 void lcdscrollvert(LcdDescriptor_t *lcd, const char *line, uint len, u8 direction);
 void lcdscrollhoriz(LcdDescriptor_t *lcd, u8 direction);
 void lcdcustomchar(LcdDescriptor_t *lcd, u8 num, const u8 *bitmap);
-u8 lcdsendbuffer(LcdDescriptor_t *lcd, const char *data, u8 len);
 
 #endif //LCDI2C_LCDLIB_H
