@@ -76,7 +76,11 @@ typedef struct ioctl_description {
 
 static int lcdi2c_register(struct i2c_client *client);
 static void lcdi2c_unregister(struct i2c_client *client);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 static int lcdi2c_probe(struct i2c_client *client);
+#else
+static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *id);
+#endif
 static void lcdi2c_remove(struct i2c_client *client);
 static void lcdi2c_shutdown(struct i2c_client *client);
 static ssize_t lcdi2c_fopread(struct file *file, char __user *buffer, size_t length, loff_t *offset);

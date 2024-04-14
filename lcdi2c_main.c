@@ -129,7 +129,11 @@ static void set_welcome_message(LcdDescriptor_t *lcdData, char *welcome_msg) {
     strncpy(lcdData->welcome, strlen(welcome_msg) ? welcome_msg : DEFAULT_WS, WS_MAX_LEN);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 static int lcdi2c_probe(struct i2c_client *client) {
+#else
+static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
+#endif
     int ret = 0;
 
     lcdi2c_gDescriptor = (LcdDescriptor_t *) devm_kzalloc(&client->dev, sizeof(LcdDescriptor_t), GFP_KERNEL);
@@ -193,7 +197,11 @@ static int lcdi2c_register(struct i2c_client *client) {
         return -1;
     }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
     lcd_handler->driver_data.lcdi2c_class = class_create(DEVICE_CLASS_NAME);
+#else
+    lcd_handler->driver_data.lcdi2c_class = class_create(THIS_MODULE, DEVICE_CLASS_NAME);
+#endif
     if (IS_ERR(lcd_handler->driver_data.lcdi2c_class)) {
         dev_warn(&client->dev, "class creation failed %s\n", DEVICE_CLASS_NAME);
         goto classError;
