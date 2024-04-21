@@ -132,7 +132,7 @@ static void set_welcome_message(LcdDescriptor_t *lcdData, char *welcome_msg) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 static int lcdi2c_probe(struct i2c_client *client) {
 #else
-static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int lcdi2c_probe(struct i2c_client *client, const struct i2c_device_id *id) {
 #endif
     int ret = 0;
 
@@ -637,14 +637,12 @@ static ssize_t lcdi2c_data(struct device *dev,
 
 static ssize_t lcdi2c_data_show(struct device *dev,
                                 struct device_attribute *attr, char *buf) {
-    u8 i = 0;
-
     if (SEM_DOWN(lcdi2c_gDescriptor)) {
         return -ERESTARTSYS;
     }
 
     if (buf) {
-        for (i = 0; i < (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows); i++) {
+        for (u8 i = 0; i < (lcdi2c_gDescriptor->organization.columns * lcdi2c_gDescriptor->organization.rows); i++) {
             buf[i] = lcdi2c_gDescriptor->raw_data[i];
         }
     }
@@ -657,7 +655,6 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
                                 struct device_attribute *attr, char *buf) {
 
     ssize_t count = 0;
-    char tmp[SHORT_STR_LEN], lines[META_BUFFER_LEN];
 
     if (SEM_DOWN(lcdi2c_gDescriptor)) {
         return -ERESTARTSYS;
@@ -665,6 +662,7 @@ static ssize_t lcdi2c_meta_show(struct device *dev,
 
 
     if (buf) {
+        char tmp[SHORT_STR_LEN], lines[META_BUFFER_LEN];
         memset(lines, 0, META_BUFFER_LEN);
         for (int i = 0; i < lcdi2c_gDescriptor->organization.rows; i++) {
             snprintf(tmp, SHORT_STR_LEN, "%d: 0x%02X, ", i, lcdi2c_gDescriptor->organization.addresses[i]);

@@ -296,7 +296,7 @@ u8 lcdprint(LcdDescriptor_t *lcd, const char *data) {
                 i++;
                 break;
         }
-    } while (data[i] && i < max_len);
+    } while (i < max_len && data[i]);
     return (lcd->column + (lcd->row * lcd->organization.columns));
 }
 
